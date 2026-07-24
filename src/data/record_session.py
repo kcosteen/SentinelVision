@@ -2,16 +2,17 @@
 Record a session's per-frame features to CSV (Phase 1 data collection).
 
 Point it at your webcam or a recorded clip and it writes one row per frame using
-FeatureExtractor. If a clip shows a single behavior, stamp every row at once with
-`--label`; otherwise leave it blank and fill the `label` column in afterwards.
+FeatureExtractor. Because proctoring is multi-label (behaviors co-occur), stamp
+the clip with `--labels` listing every behavior that is true for it — one or
+several. Leave it blank (or "normal") for a clean, no-abnormal-behavior clip.
 
 Examples
 --------
-    # Live webcam, show the window, label the whole session "normal"
-    python -m src.data.record_session --source 0 --show --label normal
+    # Live webcam, show the window, clip is normal behavior
+    python -m src.data.record_session --source 0 --show --labels normal
 
-    # Extract features from a recorded clip labeled as a phone incident
-    python -m src.data.record_session --source clips/clip_007.mp4 --label phone
+    # A clip where the person is looking away AND on their phone (two labels!)
+    python -m src.data.record_session --source clips/phone_002.mp4 --labels looking_away,phone
 """
 
 import argparse
@@ -23,8 +24,9 @@ from datetime import datetime
 import cv2
 
 from src.data.feature_extractor import FeatureExtractor, MEASUREMENT_FIELDS
+from src.data.labels import BEHAVIOR_LABELS, LABEL_COLUMNS, parse_labels
 
-CSV_FIELDS = ["session_id", "frame_index", "time_sec"] + MEASUREMENT_FIELDS + ["label"]
+CSV_FIELDS = ["session_id", "frame_index", "time_sec"] + MEASUREMENT_FIELDS + LABEL_COLUMNS
 
 
 def parse_source(source):
@@ -50,14 +52,22 @@ def main():
         help="identifier stored in each row (default: a timestamp)",
     )
     parser.add_argument(
-        "--label", default="",
-        help="optional label stamped on every row (e.g. normal / phone / looking_away)",
+        "--labels", default="",
+        help="comma-separated behaviors true for THIS clip (they can co-occur), "
+             "e.g. 'looking_away,phone'. Use 'normal' or leave empty for none. "
+             f"Valid: {BEHAVIOR_LABELS}",
     )
     parser.add_argument(
         "--show", action="store_true",
         help="display the video while recording",
     )
     args = parser.parse_args()
+
+    # Resolve labels up front so a typo fails before we open the camera.
+    try:
+        label_columns = parse_labels(args.labels)
+    except ValueError as error:
+        raise SystemExit(str(error))
 
     session_id = args.session_id or datetime.now().strftime("session_%Y%m%d_%H%M%S")
     out_path = args.out or os.path.join("data", "sessions", f"{session_id}.csv")
@@ -97,9 +107,9 @@ def main():
                 "session_id": session_id,
                 "frame_index": frame_index,
                 "time_sec": time_sec,
-                "label": args.label,
             }
             row.update(measurements)
+            row.update(label_columns)  # same label(s) stamped on every frame
             writer.writerow(row)
             rows_written += 1
 

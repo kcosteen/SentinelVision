@@ -188,6 +188,9 @@ clips (see `evaluation/`).
 | Threshold tuning | Picking cutoff constants — can be guessed or chosen on a validation set (no training). |
 | Training | Learning a model's parameters from labeled data. |
 | Fine-tuning | Continuing to train a *pre-trained* model on your own data. |
+| Multi-class | Each example gets exactly one of N mutually-exclusive labels. |
+| Multi-label | Each example can carry several labels at once (looking away *and* on a phone). |
+| Feature vs. label | A feature is a measured input; a label is the target to predict. |
 | Precision | Of my positive predictions, how many were correct? |
 | Recall | Of the actual positives, how many did I find? |
 | F1 | Harmonic mean of precision and recall. |
