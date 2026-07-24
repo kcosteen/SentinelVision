@@ -15,6 +15,10 @@ __pycache__/
 # sample_features.csv schema example stay tracked.
 /data/sessions/
 
+# Raw recorded video clips (your own footage — private / large). Keep the folder + README.
+/clips/*
+!/clips/README.md
+
 # Editor / tooling settings (local, machine-specific)
 .vscode/
 .claude/settings.local.json
