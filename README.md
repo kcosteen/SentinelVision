@@ -88,8 +88,14 @@ The cumulative score maps to a risk status:
 ```
 SentinelVision/
 ├── main.py                          # Entry point — runs the live proctoring loop
+├── ROADMAP.md                       # Project plan & milestones
 ├── requirements.txt
+├── requirements-dev.txt             # Test dependencies (pytest)
 ├── yolov8n.pt                       # Pre-trained YOLOv8 weights (included)
+├── docs/
+│   └── DESIGN_NOTES.md              # Architecture, tradeoffs, and glossary
+├── tests/                           # Unit tests (pytest)
+├── evaluation/                      # Metrics harness (precision / recall / F1)
 ├── logs/
 │   ├── events.csv                   # Flagged events + running score
 │   └── detections.csv               # Raw object detections
@@ -142,12 +148,37 @@ The YOLOv8 weights (`yolov8n.pt`) are already included, so no extra download is 
 
 ---
 
+## 🧪 Testing & Evaluation
+
+The project is measured, not just eyeballed:
+
+```bash
+pip install -r requirements-dev.txt
+
+# Run the unit-test suite (geometry, EAR, gaze, scoring engine)
+pytest
+
+# Evaluate detection quality — precision / recall / F1 per behavior
+python -m evaluation.evaluate
+```
+
+Detection quality is scored against human-labeled clips using
+**precision / recall / F1** (see [`evaluation/`](evaluation/README.md) for how to
+build a labeled test set). Design decisions and tradeoffs are documented in
+[`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md).
+
+---
+
 ## 🗺️ Roadmap
+
+> Full plan with skills mapped to each phase: [`ROADMAP.md`](ROADMAP.md)
 
 - [x] Real-time face detection & presence checks
 - [x] Iris-based gaze estimation (Left / Right / Center)
 - [x] YOLOv8 object & phone detection
 - [x] Behavior scoring engine with risk status + event logging
+- [x] Unit tests + evaluation harness (precision / recall / F1)
+- [ ] Replace the rules engine with a trained temporal behavior model
 - [ ] Integrate blink-rate & head-pose signals into the live score _(modules already built)_
 - [ ] End-of-session summary report
 - [ ] Save alert snapshots alongside the CSV log

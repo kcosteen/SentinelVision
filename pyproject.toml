@@ -1,0 +1,12 @@
+[project]
+name = "sentinelvision"
+version = "0.1.0"
+description = "AI proctoring system — real-time exam monitoring with computer vision"
+requires-python = ">=3.9"
+
+# pytest configuration.
+# `pythonpath = ["."]` lets tests import the `src` package from the repo root
+# (e.g. `from src.utils.geometry import distance`) without installing the project.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
