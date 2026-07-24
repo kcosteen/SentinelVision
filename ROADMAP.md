@@ -20,9 +20,10 @@ Foundations that let every later phase be measured instead of guessed.
 
 Replace the hand-coded rules in `proctor_analyzer.py` with a *trained* model.
 
-- [ ] Log per-frame features (gaze, head pose, blink rate, face count, objects)
-      over sliding time windows
-- [ ] Label sessions as normal / suspicious segments -> a real dataset
+- [x] Log per-frame features to CSV (`src/data/`) — gaze, head pose, blink,
+      face count, objects
+- [ ] Record + label sessions as normal / suspicious segments -> a real dataset
+- [ ] Aggregate frames into sliding time windows (blink rate, gaze variance, ...)
 - [ ] Train a classifier: start simple (logistic regression / gradient boosting),
       then a temporal model (LSTM / GRU / 1D-CNN)
 - [ ] Evaluate with train/val/test split, ROC-AUC, precision-recall, calibration

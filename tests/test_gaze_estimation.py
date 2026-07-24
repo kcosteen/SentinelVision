@@ -14,7 +14,9 @@ We build fake landmarks only for the indices the function actually reads
 coordinates pass through unchanged.
 """
 
-from src.features.gaze_estimation import estimate_gaze
+import pytest
+
+from src.features.gaze_estimation import estimate_gaze, gaze_ratio
 
 
 class FakeLandmark:
@@ -51,3 +53,11 @@ def test_gaze_left():
 def test_gaze_right():
     # iris at x=55 -> ratio = (55-20)/40 = 0.875 (> 0.65) -> RIGHT
     assert estimate_gaze(make_landmarks(55), width=1, height=1) == "RIGHT"
+
+
+def test_gaze_ratio_returns_continuous_value():
+    # The raw ratio (used as an ML feature) is the number the LEFT/RIGHT/CENTER
+    # label is derived from: (iris_x - left_corner) / eye_width.
+    assert gaze_ratio(make_landmarks(40), width=1, height=1) == pytest.approx(0.5)
+    assert gaze_ratio(make_landmarks(25), width=1, height=1) == pytest.approx(0.125)
+    assert gaze_ratio(make_landmarks(55), width=1, height=1) == pytest.approx(0.875)

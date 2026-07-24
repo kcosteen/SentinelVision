@@ -10,6 +10,11 @@ __pycache__/
 # pytest cache
 .pytest_cache/
 
+# Recorded sessions / extracted features (your own data — often private, can be large).
+# Scoped to the top-level output dir so src/data/ code and the committed
+# sample_features.csv schema example stay tracked.
+/data/sessions/
+
 # Editor / tooling settings (local, machine-specific)
 .vscode/
 .claude/settings.local.json

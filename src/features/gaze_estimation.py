@@ -44,21 +44,31 @@ def calculate_gaze_ratio(eye_corners, iris_center, landmarks, width, height):
 
 
 
-def estimate_gaze(landmarks, width, height):
+def gaze_ratio(landmarks, width, height):
+    """Return the raw horizontal gaze ratio for the left eye.
+
+    ~0.0 -> iris at the left corner, ~1.0 -> at the right corner. This continuous
+    value is more useful for a model than the LEFT/RIGHT/CENTER label, which
+    throws information away.
+    """
     left_iris = get_iris_center(
         LEFT_IRIS,
         landmarks,
         width,
         height
     )
-    
-    ratio = calculate_gaze_ratio(
+
+    return calculate_gaze_ratio(
         LEFT_EYE_CORNERS,
         left_iris,
         landmarks,
         width,
         height
     )
+
+
+def estimate_gaze(landmarks, width, height):
+    ratio = gaze_ratio(landmarks, width, height)
 
     if ratio < 0.35:
         return "LEFT"
