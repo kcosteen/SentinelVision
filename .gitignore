@@ -6,3 +6,7 @@ __pycache__/
 
 # Compiled Python files
 *.pyc
+
+# Editor / tooling settings (local, machine-specific)
+.vscode/
+.claude/settings.local.json
