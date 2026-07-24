@@ -1,13 +1,13 @@
-# 🎓 AI-Proctor
+# 🛡️ SentinelVision
 
-**A real-time online-exam monitoring system that watches a webcam feed and flags suspicious behavior using computer vision.**
+**An AI proctoring system — real-time online-exam monitoring that watches a webcam feed and flags suspicious behavior using computer vision.**
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-Vision-5C3EE8?logo=opencv&logoColor=white)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Face%20Mesh-00A67E)
 ![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-7C3AED)
 
-AI-Proctor analyzes a live camera stream frame-by-frame to detect the behaviors that matter during a remote exam — a candidate leaving the frame, a second person appearing, eyes drifting off-screen, or a phone coming into view — and turns those signals into a running **suspicion score** with a **risk status** (`Normal → Suspicious → High Risk`). Every flagged event is timestamped and written to a CSV audit log.
+SentinelVision analyzes a live camera stream frame-by-frame to detect the behaviors that matter during a remote exam — a candidate leaving the frame, a second person appearing, eyes drifting off-screen, or a phone coming into view — and turns those signals into a running **suspicion score** with a **risk status** (`Normal → Suspicious → High Risk`). Every flagged event is timestamped and written to a CSV audit log.
 
 > Built as a portfolio project to explore practical computer vision end-to-end: face detection, facial-landmark analysis, iris-based gaze estimation, head-pose geometry, and real-time object detection — wired together into a single decision-making pipeline.
 
@@ -86,7 +86,7 @@ The cumulative score maps to a risk status:
 ## 📁 Project Structure
 
 ```
-AI-Proctor/
+SentinelVision/
 ├── main.py                          # Entry point — runs the live proctoring loop
 ├── requirements.txt
 ├── yolov8n.pt                       # Pre-trained YOLOv8 weights (included)
@@ -120,8 +120,8 @@ AI-Proctor/
 
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
-cd AI-Proctor
+git clone https://github.com/kcosteen/SentinelVision.git
+cd SentinelVision
 
 # 2. (Recommended) create and activate a virtual environment
 python -m venv .venv
