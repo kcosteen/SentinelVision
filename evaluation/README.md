@@ -48,3 +48,22 @@ python -m evaluation.evaluate --truth my_truth.csv --pred my_pred.csv
 
 The `sample_ground_truth.csv` / `sample_predictions.csv` files show the exact
 format and let the harness run out of the box.
+
+## How long should each clip be?
+
+Keep clips **short and single-situation — about 10 seconds each (~5–15s)**.
+
+The length follows from the labeling scheme: each clip gets *one* label per
+behavior, so a clip should show *one* clear, sustained situation. ~10 seconds is
+long enough to tell a natural quick glance apart from genuinely "looking away",
+but short enough that a single label stays honest.
+
+**Coverage matters more than length.** Vary lighting, distance, glasses, and
+people, and record **plenty of "normal" clips** — normal is the majority class,
+so you need enough negatives for the metrics to mean anything. A few deliberately
+*hard* cases (a phone half out of frame, a fast glance) are gold: they expose
+where the system breaks.
+
+> Later, Phase 1's *temporal* model will want the opposite: longer continuous
+> sessions (a few minutes) labeled by timestamp/segment, not one label per clip.
+

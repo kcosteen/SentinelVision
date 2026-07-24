@@ -127,7 +127,38 @@ High Risk.
 
 ---
 
-## 8. How we evaluate
+## 8. From guessing to learning: tuning vs. training vs. fine-tuning
+
+A favorite interview probe: these three ways to "improve" a model are **not** the
+same thing. Keep them distinct.
+
+- **Threshold tuning** — choosing the magic constants (gaze `0.35/0.65`, the `0.6`
+  confidence cutoff, the score weights `20/40/10/50`). Today these are *guessed*.
+  With a labeled validation set you can instead *sweep* candidate values and keep
+  whichever maximizes F1. This is **not training a model** — no weights are
+  learned — but it already replaces guessing with evidence. Cheapest upgrade.
+- **Training a (new) model** — learning the parameters of a *new* model from your
+  data. **Phase 1**: feed the per-frame features (gaze, head pose, blink, objects)
+  plus labels into a classifier so it *learns* how to weigh them, replacing the
+  hand-coded rules in `proctor_analyzer.py`.
+- **Fine-tuning** — taking an *existing* pre-trained network (YOLOv8, trained on
+  COCO) and continuing its training on your own labeled images so its weights
+  adapt to your domain (exam webcam angles, earbuds, notes). **Phase 2**. It
+  reuses everything the model already knows about generic objects and only nudges
+  it toward your specialty — far cheaper than training from scratch.
+
+**Prerequisite for all three (except plain guessing): labeled data.** The *kind*
+differs — threshold tuning and behavior training need labeled clips / feature
+logs; YOLO fine-tuning needs images with bounding-box annotations. So the honest
+order is: *collect + label data → tune thresholds on it (quick win) → train the
+behavior model (Phase 1) → fine-tune the detector (Phase 2).*
+
+> Being able to say *"I don't always need to train a model — sometimes tuning on a
+> validation set is enough"* signals real engineering judgment.
+
+---
+
+## 9. How we evaluate
 
 We measure per-behavior **precision, recall, and F1** against human-labeled
 clips (see `evaluation/`).
@@ -139,7 +170,7 @@ clips (see `evaluation/`).
 
 ---
 
-## 9. Known limitations (own them honestly)
+## 10. Known limitations (own them honestly)
 
 - No dataset or trained model **yet** — current intelligence is pre-trained
   models + hand-tuned rules (this is what the roadmap fixes).
@@ -150,10 +181,13 @@ clips (see `evaluation/`).
 
 ---
 
-## 10. Quick glossary (interview review)
+## 11. Quick glossary (interview review)
 
 | Term | One-line meaning |
 |---|---|
+| Threshold tuning | Picking cutoff constants — can be guessed or chosen on a validation set (no training). |
+| Training | Learning a model's parameters from labeled data. |
+| Fine-tuning | Continuing to train a *pre-trained* model on your own data. |
 | Precision | Of my positive predictions, how many were correct? |
 | Recall | Of the actual positives, how many did I find? |
 | F1 | Harmonic mean of precision and recall. |
