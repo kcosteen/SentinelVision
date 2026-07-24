@@ -1,28 +1,160 @@
-# AI-Proctor
+# 🎓 AI-Proctor
 
-An AI-powered exam monitoring system using computer vision.
+**A real-time online-exam monitoring system that watches a webcam feed and flags suspicious behavior using computer vision.**
 
-The goal is to analyze student behavior using:
-- Eye tracking
-- Head pose estimation
-- Object detection
-- Behavior analysis
+![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
+![OpenCV](https://img.shields.io/badge/OpenCV-Vision-5C3EE8?logo=opencv&logoColor=white)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Face%20Mesh-00A67E)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-7C3AED)
 
-## Project Roadmap
+AI-Proctor analyzes a live camera stream frame-by-frame to detect the behaviors that matter during a remote exam — a candidate leaving the frame, a second person appearing, eyes drifting off-screen, or a phone coming into view — and turns those signals into a running **suspicion score** with a **risk status** (`Normal → Suspicious → High Risk`). Every flagged event is timestamped and written to a CSV audit log.
 
-### Phase 1: Computer Vision Fundamentals
-- [x] Project setup
-- [ ] Camera input
-- [ ] Image capture
-- [ ] Video recording
-- [ ] Image processing
+> Built as a portfolio project to explore practical computer vision end-to-end: face detection, facial-landmark analysis, iris-based gaze estimation, head-pose geometry, and real-time object detection — wired together into a single decision-making pipeline.
 
-### Phase 2: Face Analysis
-- [ ] Face detection
-- [ ] Facial landmarks
-- [ ] Eye tracking
+---
 
-### Phase 3: AI Cheating Detection
-- [ ] Head movement analysis
-- [ ] Phone detection
-- [ ] Suspicious behavior classification
+## 📽️ Demo
+
+> _Add a short screen-recording GIF here (e.g. `assets/demo.gif`) showing the live score and alerts reacting to a phone / looking away._
+
+---
+
+## ✨ Key Features
+
+| Feature | What it does | Tech |
+|---|---|---|
+| **Face presence & count** | Flags `No face detected` (candidate left) and `Multiple people detected` (someone else in frame) | MediaPipe Face Detection |
+| **Gaze tracking** | Uses iris landmarks to estimate Left / Right / Center gaze; sustained off-center looking is flagged as `Looking away` | MediaPipe Face Mesh (refined iris landmarks) |
+| **Object / phone detection** | Detects phones, books, and other objects of interest in real time | YOLOv8 (Ultralytics) |
+| **Behavior scoring engine** | Converts raw detections into a weighted suspicion score, with a per-event cooldown so one event isn't double-counted | Custom rules engine |
+| **Audit logging** | Timestamps every event and object detection to `logs/*.csv` | Python `csv` |
+| **Live HUD** | Draws the current score, risk status, and active alerts onto the video feed | OpenCV |
+
+---
+
+## 🧠 How It Works
+
+Each webcam frame is passed through three independent detectors in parallel. Their outputs feed a central **behavior analyzer** that maintains the score and decides the current risk status.
+
+```mermaid
+flowchart LR
+    A[📷 Webcam Frame] --> B[Face Detection<br/>MediaPipe]
+    A --> C[Gaze Estimation<br/>Iris Landmarks]
+    A --> D[Object Detection<br/>YOLOv8]
+    B --> E{{Behavior Analyzer}}
+    C --> E
+    D --> E
+    E --> F[🎯 Suspicion Score<br/>+ Risk Status]
+    E --> G[🗒️ Event Log CSV]
+```
+
+---
+
+## 📊 Detection Logic
+
+The analyzer assigns points to each flagged event and keeps a cumulative score:
+
+| Event | Points |
+|---|---:|
+| Looking away | +10 |
+| No face detected | +20 |
+| Multiple people detected | +40 |
+| Phone detected | +50 |
+
+A **10-second cooldown** per event type prevents the same continuous behavior from inflating the score every frame.
+
+The cumulative score maps to a risk status:
+
+| Score | Status |
+|---|---|
+| `0 – 29` | 🟢 Normal |
+| `30 – 69` | 🟡 Suspicious |
+| `70+` | 🔴 High Risk |
+
+---
+
+## 🛠️ Tech Stack
+
+- **Language:** Python
+- **Computer Vision:** OpenCV, MediaPipe (Face Detection, Face Mesh + iris)
+- **Object Detection:** Ultralytics YOLOv8 (`yolov8n`)
+- **Math / Geometry:** NumPy, `cv2.solvePnP` (head-pose estimation), Eye Aspect Ratio (EAR)
+- **Logging:** CSV audit trail
+
+---
+
+## 📁 Project Structure
+
+```
+AI-Proctor/
+├── main.py                          # Entry point — runs the live proctoring loop
+├── requirements.txt
+├── yolov8n.pt                       # Pre-trained YOLOv8 weights (included)
+├── logs/
+│   ├── events.csv                   # Flagged events + running score
+│   └── detections.csv               # Raw object detections
+└── src/
+    ├── vision/
+    │   ├── face_detection.py         # Face presence & count
+    │   ├── gaze_detection.py         # Gaze direction from face mesh
+    │   ├── blink_detection.py        # Blink detection (EAR)        ── built, integration pending
+    │   └── head_pose_detection.py    # Head orientation (solvePnP)  ── built, integration pending
+    ├── features/
+    │   ├── gaze_estimation.py        # Iris-center → gaze ratio
+    │   ├── eye_analysis.py           # Eye Aspect Ratio math
+    │   └── head_pose.py              # 3D→2D head-pose solver
+    ├── object_detection/
+    │   └── object_tracker.py         # YOLOv8 inference + logging
+    ├── behavior/
+    │   └── proctor_analyzer.py       # Scoring + risk-status engine
+    └── utils/
+        ├── event_logger.py           # CSV event logging
+        └── geometry.py               # Euclidean distance helper
+```
+
+---
+
+## 🚀 Getting Started
+
+**Prerequisites:** Python 3.9+ and a working webcam.
+
+```bash
+# 1. Clone the repository
+git clone <your-repo-url>
+cd AI-Proctor
+
+# 2. (Recommended) create and activate a virtual environment
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS / Linux:
+source .venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run
+python main.py
+```
+
+The webcam window opens with the live score and alerts. **Press `q` to quit.**
+The YOLOv8 weights (`yolov8n.pt`) are already included, so no extra download is needed.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Real-time face detection & presence checks
+- [x] Iris-based gaze estimation (Left / Right / Center)
+- [x] YOLOv8 object & phone detection
+- [x] Behavior scoring engine with risk status + event logging
+- [ ] Integrate blink-rate & head-pose signals into the live score _(modules already built)_
+- [ ] End-of-session summary report
+- [ ] Save alert snapshots alongside the CSV log
+- [ ] Configurable thresholds & multi-face identity tracking
+
+---
+
+## 📌 Note
+
+This is an **educational / portfolio project** demonstrating computer-vision techniques, not production surveillance software. It runs entirely locally and stores no video — only timestamped event logs. Any real deployment would require explicit consent, privacy safeguards, and far more rigorous validation.
