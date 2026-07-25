@@ -48,7 +48,7 @@ in only **20.7%** of frames from our own `phone_*` clips, which is why the Phase
 - [x] AP@0.5 / IoU implemented from scratch + unit tested, so the baseline
       comparison is apples-to-apples across differing class ids
 - [x] Baseline measured: **AP@0.5 0.432, precision 0.761, recall 0.406**
-- [ ] Annotate the 201 extracted frames (Roboflow / CVAT / labelImg)
+- [ ] Annotate the 201 extracted frames — see [`docs/ANNOTATION_GUIDE.md`](docs/ANNOTATION_GUIDE.md)
 - [ ] Fine-tune and report the delta, on our own footage specifically
 
 **Skills shown:** annotation, augmentation, transfer learning, mAP evaluation,
