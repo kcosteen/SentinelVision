@@ -15,6 +15,10 @@ __pycache__/
 # sample_features.csv schema example stay tracked.
 /data/sessions/
 
+# Built training table + trained model artifacts (derived from your private clips).
+/data/dataset.csv
+/models/
+
 # Raw recorded video clips (your own footage — private / large). Keep the folder + README.
 /clips/*
 !/clips/README.md

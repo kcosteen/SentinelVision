@@ -21,16 +21,34 @@ model can learn from, instead of hard-coded rules.
    python -m src.data.record_session --source 0 --show --labels normal
    ```
 
-3. Each run writes one CSV to `data/sessions/`. Collect many, then concatenate
-   them into a single training table.
+   For a folder of **single-behavior** clips named `<behavior>_<NNN>.mp4`, skip
+   the per-clip commands and label the whole folder from the filenames:
+
+   ```bash
+   python -m src.data.label_clips --dry-run   # preview the 0/1 each clip gets
+   python -m src.data.label_clips             # extract features + labels for all
+   ```
+
+3. Each run writes one CSV to `data/sessions/`.
 4. **Label (multi-label)**: proctoring behaviors co-occur, so each behavior has
    its own 0/1 column and a clip can switch on several via `--labels`. A
    single-behavior clip is labeled in one shot; for a mixed *timeline*, leave
    `--labels` blank and edit the `label_*` columns by time segment afterwards
    (use `time_sec` / `frame_index`).
-5. **Train (Phase 1)**: load the combined CSV, aggregate rows into sliding time
-   windows (e.g. blink rate and gaze variance over the last 2 seconds), and train
-   a classifier on those windows.
+5. **Build the windowed dataset**: aggregate the per-frame CSVs into sliding time
+   windows (blink rate, gaze/head variance, etc. over ~2s) — the rows a model
+   actually learns from:
+
+   ```bash
+   python -m src.data.build_dataset   # data/sessions/*.csv -> data/dataset.csv
+   ```
+
+   Each window carries a `clip_id` so the train/test split can be grouped **by
+   clip** (never by row — two windows from the same clip are correlated, and
+   splitting them across the boundary leaks the answer).
+6. **Train (Phase 1)**: load `data/dataset.csv` and train a multi-label
+   classifier on the windowed features, evaluating per-behavior precision /
+   recall / F1 against the hand-tuned rules baseline.
 
 ## Columns (schema)
 

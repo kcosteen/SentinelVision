@@ -5,3 +5,6 @@ numpy
 
 # Real-time object detection (YOLOv8)
 ultralytics
+
+# Data wrangling for the Phase 1 training dataset (windowed feature aggregation)
+pandas
