@@ -175,6 +175,10 @@ This currently yields **201 frames** awaiting annotation in
 `data/detection/raw_frames/` (gitignored — they're cut from private footage),
 alongside a `manifest.csv` recording each frame's baseline confidence.
 
+The labelling protocol — what counts as a phone box under occlusion, why a frame
+with no visible phone gets an *empty* label rather than a guess, and how to verify
+before training — is in [`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md).
+
 ---
 
 ## 4. Measured baseline

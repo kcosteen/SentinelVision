@@ -94,7 +94,8 @@ SentinelVision/
 ├── yolov8n.pt                       # Pre-trained YOLOv8 weights (included)
 ├── docs/
 │   ├── DESIGN_NOTES.md              # Architecture, tradeoffs, and glossary
-│   └── DATASETS.md                  # Phase 2 dataset survey, licences, baseline
+│   ├── DATASETS.md                  # Phase 2 dataset survey, licences, baseline
+│   └── ANNOTATION_GUIDE.md          # Labelling protocol for the Phase 2 frames
 ├── tests/                           # Unit tests (pytest)
 ├── evaluation/                      # Metrics harness (precision / recall / F1)
 ├── logs/
