@@ -8,3 +8,10 @@ ultralytics
 
 # Data wrangling for the Phase 1 training dataset (windowed feature aggregation)
 pandas
+
+# Phase 1 model training + evaluation
+scikit-learn
+joblib
+
+# Demo web app (upload a clip, see the proctoring result)
+streamlit
