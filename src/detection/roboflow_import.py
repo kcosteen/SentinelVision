@@ -50,7 +50,18 @@ API_KEY_ENV = "ROBOFLOW_API_KEY"
 # Roboflow's documented export endpoint. Asking for yolov8 gives us the layout
 # prepare_dataset.py already knows how to read.
 EXPORT_URL = "https://api.roboflow.com/{workspace}/{project}/{version}/{fmt}"
-EXPORT_FORMAT = "yolov8"
+PROJECT_URL = "https://api.roboflow.com/{workspace}/{project}"
+
+# Roboflow rejects a format that doesn't match the project type, so ask what the
+# project *is* before requesting an export. A "cheating detection" dataset may
+# well be whole-image classification rather than boxes -- that distinction
+# decides whether it can train a detector at all.
+FORMAT_FOR_TYPE = {
+    "object-detection": "yolov8",
+    "instance-segmentation": "yolov8",
+    "classification": "folder",
+}
+DEFAULT_FORMAT = "yolov8"
 
 # The export zip is the whole dataset, so allow a generous read timeout.
 TIMEOUT_SECONDS = 120
@@ -73,7 +84,67 @@ def require_api_key():
     return key
 
 
-def request_export_link(source, version, api_key):
+def fetch_project_metadata(source, api_key):
+    """What kind of project is this, and what's actually in it?
+
+    Returns the parsed `project` object. Worth doing before any download: it
+    reports the type (detection vs classification), the real image count, the
+    class distribution and the licence -- all things this project has previously
+    taken on trust from a search snippet and regretted.
+    """
+    url = PROJECT_URL.format(workspace=source["workspace"], project=source["project"])
+    request_url = f"{url}?{urllib.parse.urlencode({'api_key': api_key})}"
+
+    try:
+        with urllib.request.urlopen(request_url, timeout=TIMEOUT_SECONDS) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as error:
+        raise SystemExit(_http_message(error, url, source))
+    except urllib.error.URLError as error:
+        raise SystemExit(f"Could not reach Roboflow: {error.reason}")
+
+    return payload.get("project") or {}
+
+
+def describe_project(project):
+    """Print the metadata that decides whether this dataset is usable."""
+    print(f"  type      : {project.get('type')}")
+    print(f"  images    : {project.get('images')} "
+          f"({project.get('unannotated')} unannotated)")
+    print(f"  licence   : {project.get('license')}")
+    splits = project.get("splits") or {}
+    if splits:
+        print(f"  splits    : " + ", ".join(f"{k}={v}" for k, v in splits.items()))
+    classes = project.get("classes") or {}
+    if classes:
+        print(f"  classes   : " + ", ".join(f"{k}={v}" for k, v in classes.items()))
+
+
+def _http_message(error, url, source):
+    """A useful message from an HTTPError, including the server's own text.
+
+    The response body carries the actual reason ("yolov8 is an invalid format for
+    project type classification"), which is far more use than the status code.
+    The URL is reported without its query string so the API key never appears.
+    """
+    try:
+        body = error.read().decode("utf-8", "replace")[:400]
+    except Exception:
+        body = ""
+
+    if error.code == 401:
+        return f"Roboflow rejected the key in {API_KEY_ENV} (HTTP 401)."
+    if error.code == 404:
+        return (
+            f"Not found (HTTP 404): {url}\n"
+            f"Most likely the version is wrong. Open {source['url']} and use the "
+            f"version number shown there:\n"
+            f"  python -m src.detection.roboflow_import --source ... --version N"
+        )
+    return f"Roboflow returned HTTP {error.code} for {url}\n  {body}"
+
+
+def request_export_link(source, version, api_key, export_format):
     """Ask Roboflow for a download link. Returns the zip URL.
 
     The endpoint answers with JSON describing the generated export. A dataset
@@ -84,7 +155,7 @@ def request_export_link(source, version, api_key):
         workspace=source["workspace"],
         project=source["project"],
         version=version,
-        fmt=EXPORT_FORMAT,
+        fmt=export_format,
     )
     # The key travels as a query parameter (what the API expects) but is never
     # echoed: every message below prints `url`, not the full request.
@@ -95,17 +166,7 @@ def request_export_link(source, version, api_key):
         with urllib.request.urlopen(request_url, timeout=TIMEOUT_SECONDS) as response:
             payload = json.load(response)
     except urllib.error.HTTPError as error:
-        # Re-raise without the URL, which carries the key in its query string.
-        if error.code == 401:
-            raise SystemExit(f"Roboflow rejected the key in {API_KEY_ENV} (HTTP 401).")
-        if error.code == 404:
-            raise SystemExit(
-                f"Not found (HTTP 404): {url}\n"
-                f"Most likely the version is wrong. Open {source['url']} and use "
-                f"the version number shown there:\n"
-                f"  python -m src.detection.roboflow_import --source ... --version N"
-            )
-        raise SystemExit(f"Roboflow returned HTTP {error.code} for {url}")
+        raise SystemExit(_http_message(error, url, source))
     except urllib.error.URLError as error:
         raise SystemExit(f"Could not reach Roboflow: {error.reason}")
 
@@ -182,6 +243,9 @@ def main():
                         help="show the Roboflow sources in the registry")
     parser.add_argument("--force", action="store_true",
                         help="re-download even if the destination already exists")
+    parser.add_argument("--format", default=None,
+                        help="export format; default is chosen from the project type "
+                             "(yolov8 for detection, folder for classification)")
     args = parser.parse_args()
 
     available = by_kind("roboflow")
@@ -218,9 +282,34 @@ def main():
     api_key = require_api_key()
 
     print(f"{args.source}  ({source['workspace']}/{source['project']} v{version})")
-    print(f"Licence: {source['licence']} -- check {source['url']} before shipping.\n")
 
-    link = request_export_link(source, version, api_key)
+    project = fetch_project_metadata(source, api_key)
+    describe_project(project)
+
+    # A Universe project can be public and fully annotated yet have no generated
+    # *version*, and only versions are exportable. Catching it here explains the
+    # 404 that would otherwise look like a wrong --version.
+    if project.get("versions") == 0:
+        raise SystemExit(
+            f"\n{source['project']} has 0 generated versions, so there is nothing "
+            f"to export.\nThe owner annotated the images but never produced a "
+            f"dataset version. Nothing\non our side can fix that -- the data is "
+            f"only downloadable if they generate one.\n  {source['url']}"
+        )
+
+    project_type = project.get("type")
+    export_format = args.format or FORMAT_FOR_TYPE.get(project_type, DEFAULT_FORMAT)
+    print(f"  export as : {export_format}")
+
+    if project_type == "classification":
+        # Worth saying loudly: this cannot train or evaluate a detector, because
+        # there are no boxes to learn from or score against.
+        print("\n  NOTE: this is a CLASSIFICATION project -- whole-image labels, no\n"
+              "  bounding boxes. It cannot fine-tune the phone detector or feed\n"
+              "  prepare_dataset.py. Useful for behaviour-level work instead.")
+    print()
+
+    link = request_export_link(source, version, api_key, export_format)
     if os.path.exists(destination):
         shutil.rmtree(destination)
     download_and_extract(link, destination)
