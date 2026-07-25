@@ -19,9 +19,17 @@ __pycache__/
 /data/dataset.csv
 /models/
 
+# Phase 2 detector data: downloaded public datasets (re-fetchable), frames cut from
+# your private clips, and the merged YOLO dataset built from both. All derived or
+# external — src/detection/ rebuilds any of it from scratch.
+/data/detection/
+
 # Raw recorded video clips (your own footage — private / large). Keep the folder + README.
 /clips/*
 !/clips/README.md
+
+# Ultralytics scratch output (only appears if --project is given a relative path)
+/runs/
 
 # Editor / tooling settings (local, machine-specific)
 .vscode/

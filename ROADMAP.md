@@ -33,11 +33,26 @@ the full train -> evaluate loop.
 
 ### 🔜 Phase 2 — Train a detector
 
-- [ ] Fine-tune YOLOv8 on a custom exam dataset (phones, earbuds, notes, faces)
-      annotated in Roboflow / CVAT
-- [ ] Report mAP@0.5 vs. the pre-trained baseline
+Motivated by a measured failure, not a hunch: pre-trained YOLOv8n finds the phone
+in only **20.7%** of frames from our own `phone_*` clips, which is why the Phase 1
+`phone` model learned head-down *posture* as a proxy instead.
 
-**Skills shown:** annotation, augmentation, transfer learning, mAP evaluation.
+- [x] Survey public datasets, with licences and caveats — [`docs/DATASETS.md`](docs/DATASETS.md),
+      registry in `src/detection/sources.py`
+- [x] Roboflow Universe importer keyed off `ROBOFLOW_API_KEY`, remapping their
+      class lists onto ours and dropping out-of-scope classes
+- [x] Dataset pipeline: COCO→YOLO conversion, merge public + our own frames,
+      clip-grouped split (`src/detection/prepare_dataset.py`)
+- [x] Targeted frame extraction — keep the frames the baseline *missed*, so
+      annotation effort goes to the blind spot (`src/detection/extract_frames.py`)
+- [x] AP@0.5 / IoU implemented from scratch + unit tested, so the baseline
+      comparison is apples-to-apples across differing class ids
+- [x] Baseline measured: **AP@0.5 0.432, precision 0.761, recall 0.406**
+- [ ] Annotate the 201 extracted frames (Roboflow / CVAT / labelImg)
+- [ ] Fine-tune and report the delta, on our own footage specifically
+
+**Skills shown:** annotation, augmentation, transfer learning, mAP evaluation,
+active-learning-style sample selection, licence diligence.
 
 ### 🔜 Phase 3 — Ship it
 

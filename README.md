@@ -93,7 +93,8 @@ SentinelVision/
 ├── requirements-dev.txt             # Test dependencies (pytest)
 ├── yolov8n.pt                       # Pre-trained YOLOv8 weights (included)
 ├── docs/
-│   └── DESIGN_NOTES.md              # Architecture, tradeoffs, and glossary
+│   ├── DESIGN_NOTES.md              # Architecture, tradeoffs, and glossary
+│   └── DATASETS.md                  # Phase 2 dataset survey, licences, baseline
 ├── tests/                           # Unit tests (pytest)
 ├── evaluation/                      # Metrics harness (precision / recall / F1)
 ├── logs/
@@ -111,6 +112,20 @@ SentinelVision/
     │   └── head_pose.py              # 3D→2D head-pose solver
     ├── object_detection/
     │   └── object_tracker.py         # YOLOv8 inference + logging
+    ├── data/                         # Phase 1 — features → windowed training table
+    │   ├── feature_extractor.py      # One frame → a row of features
+    │   ├── record_session.py         # Log a webcam/video session to CSV
+    │   ├── label_clips.py            # Batch-label clips/ from their filenames
+    │   └── build_dataset.py          # Frames → sliding time windows
+    ├── models/
+    │   └── train.py                  # Phase 1 behavior classifier (grouped CV)
+    ├── detection/                    # Phase 2 — training a real phone detector
+    │   ├── sources.py                # Public-dataset registry + licences
+    │   ├── roboflow_import.py        # Fetch Roboflow sets via ROBOFLOW_API_KEY
+    │   ├── extract_frames.py         # Mine our clips for the baseline's misses
+    │   ├── prepare_dataset.py        # COCO→YOLO, merge sources, clip-grouped split
+    │   ├── detection_metrics.py      # IoU / AP@0.5 from scratch
+    │   └── train_detector.py         # Fine-tune + compare against the baseline
     ├── behavior/
     │   └── proctor_analyzer.py       # Scoring + risk-status engine
     └── utils/

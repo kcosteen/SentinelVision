@@ -13,5 +13,10 @@ pandas
 scikit-learn
 joblib
 
+# Phase 2: downloading public detection datasets from the Hugging Face Hub,
+# and reading the data.yaml class lists that ship with Roboflow YOLO exports
+huggingface_hub
+pyyaml
+
 # Demo web app (upload a clip, see the proctoring result)
 streamlit
