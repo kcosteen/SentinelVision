@@ -192,9 +192,22 @@ def main():
     from ultralytics import YOLO
     model = YOLO(args.weights)
 
-    # The COCO baseline knows 80 classes and only class 67 is a phone; our
-    # fine-tuned model knows one class, so no filter is needed (or correct).
-    class_filter = None if args.finetuned else [COCO_CELL_PHONE]
+    # Ask the model which of ITS classes is the phone, rather than assuming.
+    # This has to work for three different models: the 80-class COCO baseline
+    # (index 67), a single-class fine-tune (index 0), and a multi-class
+    # proctoring fine-tune (index 1 of six). Hard-coding any of them -- or
+    # disabling the filter entirely -- silently counts every `person` and
+    # `laptop` box as a phone prediction and reports nonsense.
+    wanted = {"cell phone", "phone", "mobile_phone", "mobile phone"}
+    model_names = model.names or {}
+    phone_index = next(
+        (i for i, n in model_names.items() if str(n).strip().lower() in wanted), None
+    )
+    if phone_index is None:
+        raise SystemExit(
+            f"No phone-like class among the model's classes: {list(model_names.values())}"
+        )
+    class_filter = [phone_index]
 
     splits = ["train", "val"] if args.split == "all" else [args.split]
     matches, n_truths, n_images, n_negatives = [], 0, 0, 0
@@ -208,8 +221,9 @@ def main():
         n_negatives += split_negatives
         n_images += split_images
 
-    label = "fine-tuned (class 0)" if args.finetuned else "COCO baseline (class 67)"
-    print(f"Model: {args.weights}   split: {args.split}   filter: {label}")
+    print(f"Model: {args.weights}   split: {args.split}")
+    print(f"  model classes: {list(model_names.values())}")
+    print(f"  scoring class {phone_index} ({model_names[phone_index]!r}) only")
     print(f"{n_images} images, {n_truths} ground-truth boxes, "
           f"{len(matches)} raw predictions at conf>={CONF_FLOOR}\n")
 
