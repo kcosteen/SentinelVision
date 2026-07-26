@@ -63,6 +63,28 @@ SOURCES = {
             "default of 1 is a guess and a wrong version is a 404."
         ),
     },
+    "roboflow_cheating_vfvwa": {
+        "kind": "roboflow",
+        "workspace": "mahmoud-mohamed-phhz1",
+        "project": "cheating-vfvwa",
+        "version": 1,
+        "url": "https://universe.roboflow.com/mahmoud-mohamed-phhz1/cheating-vfvwa/dataset/1",
+        "licence": "CC BY 4.0",
+        "size": "1,775 images (4,933 after 3x augmentation)",
+        "classes": ["cheating (992)", "normal (783)"],
+        "what": "Whole-image cheating/normal CLASSIFICATION -- no bounding boxes.",
+        "caveat": (
+            "VERIFIED BY INSPECTION. It is the Gourier Head Pose Image Database "
+            "relabelled: lab shots against a plain grey background, filenames "
+            "encoding tilt/pan. Its 'cheating' label is almost exactly "
+            "|head yaw| >= 45 degrees (F1 0.935 predicting the label from pan "
+            "alone), and tilt barely matters -- head straight DOWN is labelled "
+            "*normal*. So it contains no phones, is not exam footage, and its "
+            "notion of cheating disagrees with ours. Genuinely useful for one "
+            "thing: an external, labelled reference for where 'looking away' "
+            "begins in yaw."
+        ),
+    },
     "roboflow_cheating_person_phone": {
         "kind": "roboflow",
         "workspace": "online-exam-cheating-detection-kvdul",

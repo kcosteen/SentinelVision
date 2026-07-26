@@ -45,8 +45,12 @@ COCO_CELL_PHONE = 67
 AP_CONF_FLOOR = 0.001
 
 
-def read_yolo_labels(label_path, width, height):
-    """YOLO '<cls> <cx> <cy> <w> <h>' (normalised) -> [(x1, y1, x2, y2)] in pixels."""
+def read_yolo_labels(label_path, width, height, only_class=None):
+    """YOLO '<cls> <cx> <cy> <w> <h>' (normalised) -> [(x1, y1, x2, y2)] in pixels.
+
+    `only_class` keeps just one class id, for multi-class exports where we care
+    about a single object (e.g. 'cell phone' among six proctoring classes).
+    """
     if not os.path.exists(label_path):
         return []
 
@@ -56,7 +60,9 @@ def read_yolo_labels(label_path, width, height):
             parts = line.split()
             if len(parts) < 5:
                 continue
-            _, cx, cy, w, h = (float(p) for p in parts[:5])
+            class_id, cx, cy, w, h = (float(p) for p in parts[:5])
+            if only_class is not None and int(class_id) != only_class:
+                continue
             # Centre form -> corner form, scaled back up to pixels.
             boxes.append((
                 (cx - w / 2) * width,

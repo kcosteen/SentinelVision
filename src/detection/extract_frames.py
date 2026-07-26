@@ -60,14 +60,37 @@ def find_clips(clips_dir, pattern):
     return sorted(paths)
 
 
-def baseline_phone_conf(yolo, frame, conf_threshold):
-    """Highest 'cell phone' confidence the pre-trained detector gives this frame.
+PHONE_CLASS_NAMES = {"cell phone", "phone", "mobile_phone", "mobile phone"}
+
+
+def phone_class_index(yolo):
+    """Which of THIS model's classes is the phone.
+
+    Must be looked up, not hard-coded: it's 67 in the 80-class COCO baseline, 0
+    in a single-class fine-tune, and 1 in the six-class proctoring fine-tune.
+    Asking for class 67 from a six-class model matches nothing and would report
+    a 0% detection rate that looks like catastrophic failure rather than a bug.
+    """
+    names = yolo.names or {}
+    index = next(
+        (i for i, n in names.items() if str(n).strip().lower() in PHONE_CLASS_NAMES),
+        None,
+    )
+    if index is None:
+        raise SystemExit(
+            f"No phone-like class in the model: {list(names.values())}"
+        )
+    return index
+
+
+def baseline_phone_conf(yolo, frame, conf_threshold, phone_class):
+    """Highest phone confidence this detector gives the frame.
 
     Returns 0.0 when it sees no phone -- which, in a clip we labelled `phone`,
     is precisely the miss we want to annotate.
     """
-    # class 67 = 'cell phone' in COCO. Asking for only that class keeps this fast.
-    results = yolo(frame, classes=[67], verbose=False)
+    # Restricting to the one class we care about also keeps this fast.
+    results = yolo(frame, classes=[phone_class], verbose=False)
     best = 0.0
     for box in results[0].boxes:
         conf = float(box.conf[0])
@@ -76,7 +99,7 @@ def baseline_phone_conf(yolo, frame, conf_threshold):
     return best
 
 
-def sample_clip(path, yolo, args):
+def sample_clip(path, yolo, args, phone_class=None):
     """Walk one clip; return the rows (frame, metadata) selected for annotation.
 
     Returns (selected_rows, total_considered, missed_count) so the caller can
@@ -110,7 +133,7 @@ def sample_clip(path, yolo, args):
 
         conf = 0.0
         if yolo is not None:
-            conf = baseline_phone_conf(yolo, frame, args.conf)
+            conf = baseline_phone_conf(yolo, frame, args.conf, phone_class)
         detected = conf > 0
         if detected:
             detected_count += 1
@@ -171,9 +194,13 @@ def main():
 
     # 'uniform' needs no model, so don't pay to load one.
     yolo = None
+    phone_class = None
     if args.strategy == "missed":
         from ultralytics import YOLO
         yolo = YOLO(args.weights)
+        phone_class = phone_class_index(yolo)
+        print(f"{args.weights}: scoring class {phone_class} "
+              f"({yolo.names[phone_class]!r}) of {len(yolo.names)}\n")
 
     if not args.dry_run:
         os.makedirs(args.out_dir, exist_ok=True)
@@ -182,7 +209,7 @@ def main():
     total_considered = total_missed = 0
 
     for path in clips:
-        selected, considered, missed = sample_clip(path, yolo, args)
+        selected, considered, missed = sample_clip(path, yolo, args, phone_class)
         total_considered += considered
         total_missed += missed
 
