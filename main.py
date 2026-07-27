@@ -1,12 +1,19 @@
+import time
+
 import cv2
 
+from src.vision import hud
 from src.vision.face_detection import detect_faces
 from src.vision.gaze_detection import detect_gaze
 from src.features.head_pose import calculate_head_pose
-from src.object_detection.object_tracker import detect_objects
+from src.object_detection.object_tracker import (
+    CONF_THRESHOLD,
+    detect_objects,
+    using_finetuned,
+)
 from src.utils.event_logger import log_event
 
-from src.behavior.proctor_analyzer import ProctorAnalyzer
+from src.behavior.proctor_analyzer import EVENT_POINTS, ProctorAnalyzer
 
 def main():
 
@@ -15,6 +22,16 @@ def main():
 
     # Open webcam
     camera = cv2.VideoCapture(0)
+
+    # Named so the HUD can say which detector produced what's on screen -- the
+    # fine-tune and the COCO fallback are not interchangeable.
+    detector_label = (
+        f"fine-tuned yolov8n  conf {CONF_THRESHOLD}" if using_finetuned()
+        else f"COCO yolov8n (fallback)  conf {CONF_THRESHOLD}"
+    )
+
+    frames_drawn = 0
+    started = time.time()
 
     while True:
 
@@ -25,18 +42,18 @@ def main():
 
         # Keep a pristine copy for anything that MEASURES.
         #
-        # detect_faces draws its boxes and keypoints onto the frame it is given,
-        # in place. Passing that same frame on to YOLO means the detector sees
-        # graphics painted over the person: measured on a real clip, those ~3k
-        # altered pixels dropped `person` from 0.63 to no detection at all.
-        # So: `frame` is what the user sees and may be drawn on, `source` is what
-        # the models are allowed to measure.
+        # `source` is what the models are allowed to see; `frame` is what the
+        # viewer sees and the only thing that may be drawn on. detect_faces used
+        # to paint boxes onto the array it was handed, and YOLO then read those
+        # graphics -- on a real clip, ~3,000 altered pixels dropped `person` from
+        # 0.63 to no detection at all. Drawing now lives solely in src/vision/hud.py,
+        # which never receives `source`, so that class of bug cannot recur.
         source = frame.copy()
 
         # ------------------------
-        # Face Detection  (draws on `frame`)
+        # Face Detection
         # ------------------------
-        face_results, face_count = detect_faces(frame)
+        face_results, face_count = detect_faces(source)
 
         # ------------------------
         # Gaze Detection
@@ -64,7 +81,7 @@ def main():
         # ------------------------
         # Object Detection
         # ------------------------
-        yolo_results, detected_objects = detect_objects(source)
+        _, detected_objects = detect_objects(source)
 
         # ------------------------
         # Analyze Behavior
@@ -96,59 +113,24 @@ def main():
                 )
 
         # ------------------------
-        # Display information
+        # Display
         # ------------------------
-        # Drawn on `frame` (the display copy), never on `source`.
-        yaw_text = f"{abs(head_yaw):.0f} deg" if head_yaw is not None else "n/a"
+        # Everything below draws on `frame`, the display copy -- never on
+        # `source`, which is what the models measure.
+        frames_drawn += 1
+        elapsed = time.time() - started
+        fps = frames_drawn / elapsed if elapsed > 0 else None
 
-        cv2.putText(
-            frame,
-            f"Gaze: {gaze}   Head: {yaw_text}",
-            (20, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2
-        )
+        status = analyzer.get_status()
 
-        cv2.putText(
-            frame,
-            f"Score: {analyzer.score}",
-            (20, 90),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 0, 255),
-            2
-        )
+        hud.draw_faces(frame, face_results)
+        hud.draw_detections(frame, detected_objects)
+        hud.draw_status(frame, status, analyzer.score, calibrating=calibrating)
+        hud.draw_signals(frame, gaze, head_yaw, fps=fps, detector=detector_label)
+        hud.draw_events(frame, [] if calibrating else events, weights=EVENT_POINTS)
+        hud.draw_title(frame, subtitle="fine-tuned YOLOv8n + calibrated thresholds")
 
-        status = "Calibrating scene..." if calibrating else analyzer.get_status()
-
-        cv2.putText(
-            frame,
-            f"Status: {status}",
-            (20, 170),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 0, 255),
-            2
-        )
-
-        y = 130
-        for event in ([] if calibrating else events):
-            cv2.putText(
-                frame,
-                event,
-                (20, y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 0, 255),
-                2
-            )
-            y += 30
-
-            
-
-        cv2.imshow("AI Proctor", frame)
+        cv2.imshow("SentinelVision", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break

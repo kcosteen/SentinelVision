@@ -30,6 +30,19 @@ from src.thresholds import (
 )
 
 
+# Weights track how much each signal is TRUSTED, not just how bad the behaviour
+# is. "Gaze off screen" is the cheapest because it rests on the one threshold
+# still uncalibrated -- see the note in analyze(). Module-level so the HUD can
+# show each alert's cost without keeping a second copy that could drift.
+EVENT_POINTS = {
+    "No face detected": 20,
+    "Multiple people detected": 40,
+    "Looking away": 10,
+    "Gaze off screen": 5,
+    "Phone detected": 50,
+}
+
+
 class ProctorAnalyzer:
 
     def __init__(self, now=None):
