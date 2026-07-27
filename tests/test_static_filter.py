@@ -7,7 +7,11 @@ the filter forgets furniture, notices a phone the moment it moves, and never
 touches classes it does not govern.
 """
 
-from src.object_detection.static_filter import StaticRegionFilter, iou
+from src.object_detection.static_filter import (
+    StaticRegionFilter,
+    centre_offset,
+    iou,
+)
 
 SHELF = (890.0, 120.0, 1010.0, 400.0)
 PHONE = (300.0, 250.0, 420.0, 530.0)
@@ -76,14 +80,35 @@ def test_picked_up_phone_is_reported_again():
     assert f.step([("cell phone", moved)])[0] is True
 
 
-def test_small_jitter_does_not_reset_the_streak():
-    """Detector noise on a static object must not read as motion."""
+def test_size_jitter_does_not_reset_the_streak():
+    """THE regression test. Measured on the real webcam: consecutive-frame IoU
+    cleared 0.80 only 12% of the time because the detector's box size thrashes,
+    while the centre moved 8px on a 1280px frame. An IoU-matched filter saw a new
+    object every frame and never suppressed anything. Centre matching must."""
     f = StaticRegionFilter(static_after=10)
     for i in range(20):
-        nudge = 1.0 if i % 2 else -1.0      # a pixel of wobble
-        box = (SHELF[0] + nudge, SHELF[1], SHELF[2] + nudge, SHELF[3])
+        grow = 60.0 if i % 2 else 0.0       # box size swings wildly...
+        box = (SHELF[0] - grow, SHELF[1] - grow, SHELF[2] + grow, SHELF[3] + grow)
         keep = f.step([("cell phone", box)])[0]
     assert keep is False
+
+
+def test_the_measured_failure_mode_would_defeat_iou_matching():
+    """Pins the diagnosis itself: these boxes share a centre but score poorly on
+    IoU, which is precisely why matching moved off it."""
+    big = (SHELF[0] - 60, SHELF[1] - 60, SHELF[2] + 60, SHELF[3] + 60)
+    assert iou(SHELF, big) < 0.80           # IoU says "different object"
+    assert centre_offset(SHELF, big) < 0.15  # centre says "same place"
+
+
+def test_slow_drift_is_never_called_static():
+    """Staticness is measured from where the streak began, not the last frame.
+    Otherwise a phone creeping across the desk would look static at every step
+    and be suppressed while plainly moving."""
+    f = StaticRegionFilter(static_after=10)
+    for i in range(40):
+        box = (300.0 + i * 6, 250.0, 420.0 + i * 6, 530.0)   # 6px per frame
+        assert f.step([("cell phone", box)])[0] is True
 
 
 def test_track_is_forgotten_after_absence():
