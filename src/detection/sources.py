@@ -51,7 +51,7 @@ SOURCES = {
         "project": "online-proctoring-system-x27ou-e7abr",
         "version": 1,
         "url": "https://universe.roboflow.com/online-exam-cheating-detection-kvdul/online-proctoring-system-x27ou-e7abr",
-        "licence": "check on the page (Roboflow Universe varies per dataset)",
+        "licence": "CC BY 4.0",
         "size": "see page",
         "classes": ["face", "phone", "other exam objects"],
         "what": "Purpose-built online-proctoring set, shot to simulate remote exams.",

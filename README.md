@@ -75,7 +75,10 @@ pytest                          # 132 tests, no camera needed
 ### 1. Fine-tuning the detector
 
 Stock COCO YOLOv8n is poor at exam-webcam phone detection, so it was fine-tuned
-on a 25,173-frame online-proctoring dataset (CC BY 4.0, 6 classes).
+on a 25,173-frame online-proctoring dataset (CC BY 4.0, 6 classes). Every dataset
+used, with licences and attribution, is listed in
+[`docs/DATASETS.md`](docs/DATASETS.md#0-datasets-used-and-attribution) — all of it
+public, so every number here is reproducible.
 
 | Model | Precision | Recall | **F1** |
 |---|---:|---:|---:|

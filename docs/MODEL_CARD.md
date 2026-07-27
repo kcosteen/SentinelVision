@@ -124,8 +124,15 @@ repository.
 **AGPL-3.0**, inherited from Ultralytics YOLOv8, which these weights are derived
 from. If you use this in a network service, AGPL obligations apply.
 
-The training data is **CC BY 4.0** and requires attribution to the
-online-proctoring-system dataset authors.
+The training data is **CC BY 4.0** and requires attribution to the *Online
+Proctoring System* dataset (online-exam-cheating-detection workspace, Roboflow
+Universe).
+
+The thresholds used alongside this model were calibrated against two further
+public datasets, credited in full in the
+[repository's dataset notes](https://github.com/kcosteen/SentinelVision/blob/main/docs/DATASETS.md):
+the Gourier Head Pose Image Database (Gourier, Hall & Crowley, 2004; CC BY 4.0 as
+redistributed) and `MichalMlodawski/closed-open-eyes` (ODC-BY).
 
 ## Citation
 

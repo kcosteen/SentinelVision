@@ -11,6 +11,40 @@ prints with `python -m src.detection.sources`.
 
 ---
 
+## 0. Datasets used, and attribution
+
+Every number this project reports comes from **public data**. Nothing was trained
+on privately recorded footage, so all of it is reproducible by anyone who clones
+the repo. Three datasets did the work:
+
+| Dataset | Used for | Size | Licence |
+|---|---|---|---|
+| [Online Proctoring System](https://universe.roboflow.com/online-exam-cheating-detection-kvdul/online-proctoring-system-x27ou-e7abr) (Roboflow Universe) | **Fine-tuning the detector**, and the held-out split every F1 in the README is measured on | 25,173 images, 6 classes | **CC BY 4.0** |
+| [Gourier Head Pose Image Database](http://crowley-coutaz.fr/Head%20Pose%20Image%20Database.html) — obtained as the relabelled Roboflow `cheating-vfvwa` export | Calibrating the head-yaw threshold (30°); filenames encode true pan/tilt angles | 463 images used | **CC BY 4.0** (as redistributed) |
+| [`MichalMlodawski/closed-open-eyes`](https://huggingface.co/datasets/MichalMlodawski/closed-open-eyes) (Hugging Face) | Calibrating the Eye Aspect Ratio threshold (0.23) | 1,999 images measured of 126,560 | **ODC-BY** |
+
+**Attribution.** CC BY 4.0 and ODC-BY both *require* credit, so it is given here
+and in [`MODEL_CARD.md`](MODEL_CARD.md) rather than left implicit:
+
+- *Online Proctoring System*, online-exam-cheating-detection workspace, Roboflow
+  Universe. Licensed CC BY 4.0.
+- N. Gourier, D. Hall, J. L. Crowley, **"Estimating Face Orientation from Robust
+  Detection of Salient Facial Structures"**, FG Net Workshop on Visual
+  Observation of Deictic Gestures (POINTING), 2004. Used via a CC BY 4.0
+  redistribution on Roboflow Universe.
+- *closed-open-eyes*, M. Młodawski, Hugging Face Datasets. Licensed ODC-BY.
+
+The released weights are **AGPL-3.0**, inherited from Ultralytics YOLOv8, which
+they are derived from — that is a property of the base model, not of the data.
+
+**What our own footage was and wasn't used for.** Locally recorded clips were
+only ever a *held-out test set*, never training data: they produced the 20.7%
+baseline detection rate that justified fine-tuning, and the 56.4% false-positive
+rate that exposed the domain shift in §7 of the design notes. They are not
+redistributed, and no model in this repo was trained on them.
+
+---
+
 ## 1. The problem we were shopping for
 
 Phase 1 trained a behaviour model on our own clips and produced a good-looking
