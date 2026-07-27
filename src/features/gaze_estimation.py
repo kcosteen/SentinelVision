@@ -1,3 +1,5 @@
+from src.thresholds import GAZE_LEFT, GAZE_RIGHT
+
 LEFT_IRIS = [474, 475, 476, 477]
 LEFT_EYE_CORNERS = [362, 263]
 
@@ -68,12 +70,20 @@ def gaze_ratio(landmarks, width, height):
 
 
 def estimate_gaze(landmarks, width, height):
+    """LEFT / RIGHT / CENTER from the iris position.
+
+    The cut-points come from src/thresholds.py, where they are marked
+    UNCALIBRATED -- no public gaze dataset with usable ground truth was found,
+    so they remain hand-picked. `ProctorAnalyzer` therefore prefers the head-yaw
+    signal, which WAS measured, and falls back to this only when no head pose is
+    available.
+    """
     ratio = gaze_ratio(landmarks, width, height)
 
-    if ratio < 0.35:
+    if ratio < GAZE_LEFT:
         return "LEFT"
 
-    elif ratio > 0.65:
+    elif ratio > GAZE_RIGHT:
         return "RIGHT"
 
     else:
