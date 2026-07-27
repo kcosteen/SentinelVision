@@ -81,7 +81,10 @@ def detect_objects(frame):
         xyxy = tuple(float(v) for v in box.xyxy[0])
         candidates.append({"label": label, "confidence": confidence, "box": xyxy})
 
-    keep = _static_filter.step([(c["label"], c["box"]) for c in candidates])
+    height, width = frame.shape[:2]
+    keep = _static_filter.step(
+        [(c["label"], c["box"]) for c in candidates], (width, height)
+    )
 
     detected = []
     for candidate, wanted in zip(candidates, keep):

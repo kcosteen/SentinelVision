@@ -1,154 +1,177 @@
 """Unit tests for background (static-object) suppression.
 
-The real case these encode: a wall shelf that the fine-tuned detector calls a
+The real case these encode: a wall shelf the fine-tuned detector calls a
 `cell phone` at 0.60-0.71, overlapping a real phone's 0.72-0.79 so completely
-that no confidence threshold separates them. Motion does. These tests pin that
-the filter forgets furniture, notices a phone the moment it moves, and never
-touches classes it does not govern.
+that no confidence threshold separates them (confirmed by a blank-background
+control, where the false detections vanish).
+
+Two earlier designs failed on the same fragility -- both tried to follow an
+individual box across frames, and this detector does not produce a followable
+box on clutter. These tests pin the properties that made those versions fail, so
+the occupancy-grid replacement cannot regress into them:
+
+* box size may thrash freely (only the centre is used)
+* several competing boxes may appear at once (no identities to confuse)
+* the frame rate may be anything (thresholds are wall-clock seconds)
 """
 
-from src.object_detection.static_filter import (
-    StaticRegionFilter,
-    centre_offset,
-    iou,
-)
+from src.object_detection.static_filter import StaticRegionFilter, centre, iou
 
-SHELF = (890.0, 120.0, 1010.0, 400.0)
-PHONE = (300.0, 250.0, 420.0, 530.0)
+FRAME = (1280, 720)
+
+SHELF = (890.0, 120.0, 1010.0, 400.0)     # background clutter, right of frame
+PHONE = (300.0, 250.0, 420.0, 530.0)      # a phone held up, well away from it
 
 
-def run(filter_, box, frames, label="cell phone"):
-    """Feed the same box for N frames; return the keep-flag from the last one."""
-    keep = [True]
-    for _ in range(frames):
-        keep = filter_.step([(label, box)])
-    return keep[0]
+def soak(f, box, seconds, start=0.0, hz=10.0, label="cell phone"):
+    """Feed one box steadily for `seconds`; return the final keep flag."""
+    keep, t, step = [True], start, 1.0 / hz
+    n = int(seconds * hz)
+    for i in range(n):
+        t = start + i * step
+        keep = f.step([(label, box)], FRAME, now=t)
+    return keep[0], t
 
 
-# --- iou -------------------------------------------------------------------
+# --- helpers ---------------------------------------------------------------
 
-def test_iou_identical_boxes():
+def test_centre_of_a_box():
+    assert centre((0.0, 0.0, 10.0, 20.0)) == (5.0, 10.0)
+
+
+def test_iou_still_available_for_diagnostics():
     assert iou(SHELF, SHELF) == 1.0
-
-
-def test_iou_disjoint_boxes():
     assert iou(SHELF, PHONE) == 0.0
 
 
-def test_iou_partial_overlap():
-    # Two unit squares offset by half -> intersection 0.5, union 1.5.
-    assert iou((0, 0, 1, 1), (0.5, 0, 1.5, 1)) == 1 / 3
-
-
-def test_iou_handles_degenerate_box():
-    assert iou((0, 0, 0, 0), (0, 0, 1, 1)) == 0.0
-
-
-# --- the core behaviour ----------------------------------------------------
+# --- core behaviour --------------------------------------------------------
 
 def test_static_object_is_reported_then_suppressed():
-    """Furniture is visible during warm-up, then learned and dropped."""
-    f = StaticRegionFilter(static_after=10)
-    assert run(f, SHELF, 9) is True, "should still report before the threshold"
-    assert run(f, SHELF, 1) is False, "should be background by frame 10"
-    assert run(f, SHELF, 50) is False, "and stay background"
+    f = StaticRegionFilter(static_seconds=2.0)
+    keep, t = soak(f, SHELF, 1.0)
+    assert keep is True, "still learning during warm-up"
+
+    keep, t = soak(f, SHELF, 3.0, start=t)
+    assert keep is False, "scenery once the cell has been busy 2s"
 
 
 def test_moving_object_is_never_suppressed():
-    """A phone drifting across the frame never builds a streak."""
-    f = StaticRegionFilter(static_after=10)
-    for i in range(40):
-        box = (300.0 + i * 25, 250.0, 420.0 + i * 25, 530.0)
-        assert f.step([("cell phone", box)])[0] is True
+    """A phone crossing the frame keeps entering fresh cells."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    for i in range(100):
+        box = (300.0 + i * 9, 250.0, 420.0 + i * 9, 530.0)
+        assert f.step([("cell phone", box)], FRAME, now=i * 0.1)[0] is True
 
 
-def test_phone_appearing_elsewhere_is_reported_despite_learned_shelf():
+def test_phone_elsewhere_is_reported_despite_learned_shelf():
     """The whole point: suppressing the shelf must not blind us to a real phone."""
-    f = StaticRegionFilter(static_after=10)
-    run(f, SHELF, 20)                       # shelf now background
+    f = StaticRegionFilter(static_seconds=2.0)
+    _, t = soak(f, SHELF, 3.0)
 
-    keep = f.step([("cell phone", SHELF), ("cell phone", PHONE)])
+    keep = f.step([("cell phone", SHELF), ("cell phone", PHONE)], FRAME, now=t + 0.1)
     assert keep == [False, True]
 
 
 def test_picked_up_phone_is_reported_again():
-    """A phone that rested, then moved, must come back immediately."""
-    f = StaticRegionFilter(static_after=10)
-    assert run(f, PHONE, 20) is False       # rested long enough to be scenery
+    f = StaticRegionFilter(static_seconds=2.0)
+    keep, t = soak(f, PHONE, 3.0)
+    assert keep is False, "rested long enough to read as scenery"
 
-    moved = (600.0, 250.0, 720.0, 530.0)    # picked up -> new location
-    assert f.step([("cell phone", moved)])[0] is True
+    moved = (700.0, 250.0, 820.0, 530.0)
+    assert f.step([("cell phone", moved)], FRAME, now=t + 0.1)[0] is True
 
 
-def test_size_jitter_does_not_reset_the_streak():
-    """THE regression test. Measured on the real webcam: consecutive-frame IoU
-    cleared 0.80 only 12% of the time because the detector's box size thrashes,
-    while the centre moved 8px on a 1280px frame. An IoU-matched filter saw a new
-    object every frame and never suppressed anything. Centre matching must."""
-    f = StaticRegionFilter(static_after=10)
-    for i in range(20):
-        grow = 60.0 if i % 2 else 0.0       # box size swings wildly...
+# --- the failures that killed the two previous designs ---------------------
+
+def test_wildly_thrashing_box_size_still_suppresses():
+    """Killed design #1. Consecutive-frame IoU measured 0.80 only 12% of the
+    time because the box size swings; suppression must not care."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    keep = [True]
+    for i in range(60):
+        grow = 80.0 if i % 2 else 0.0
         box = (SHELF[0] - grow, SHELF[1] - grow, SHELF[2] + grow, SHELF[3] + grow)
-        keep = f.step([("cell phone", box)])[0]
+        keep = f.step([("cell phone", box)], FRAME, now=i * 0.1)
+    assert keep[0] is False
+
+    # ...and those boxes really would have defeated IoU matching.
+    big = (SHELF[0] - 80, SHELF[1] - 80, SHELF[2] + 80, SHELF[3] + 80)
+    assert iou(SHELF, big) < 0.80
+
+
+def test_many_competing_boxes_still_suppresses():
+    """Killed design #2. The shelf emits several boxes that split and swap;
+    with no identities to confuse, each simply marks its own cell."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    spread = [
+        SHELF,
+        (900.0, 130.0, 1000.0, 300.0),
+        (880.0, 200.0, 1020.0, 410.0),
+    ]
+    keep = [True]
+    for i in range(60):
+        boxes = spread if i % 2 else list(reversed(spread))   # order swaps too
+        keep = f.step([("cell phone", b) for b in boxes], FRAME, now=i * 0.1)
+    assert keep == [False, False, False]
+
+
+def test_threshold_is_wall_clock_not_frames():
+    """A slow machine must behave like a fast one. 2s of footage is 2s whether
+    it arrived as 60 frames or 6."""
+    fast = StaticRegionFilter(static_seconds=2.0)
+    slow = StaticRegionFilter(static_seconds=2.0)
+
+    assert soak(fast, SHELF, 3.0, hz=30.0)[0] is False
+    assert soak(slow, SHELF, 3.0, hz=3.0)[0] is False
+
+
+def test_centre_jitter_across_a_cell_boundary_still_matures():
+    """A centre sitting on a boundary must not flip between two cells forever."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    cell = max(FRAME) * f.cell_ratio
+    x = cell * 5                                   # exactly on an edge
+    keep = [True]
+    for i in range(60):
+        nudge = 3.0 if i % 2 else -3.0
+        box = (x + nudge - 60, 300.0, x + nudge + 60, 560.0)
+        keep = f.step([("cell phone", box)], FRAME, now=i * 0.1)
+    assert keep[0] is False
+
+
+# --- forgetting ------------------------------------------------------------
+
+def test_region_is_forgotten_after_a_long_absence():
+    f = StaticRegionFilter(static_seconds=2.0, forget_seconds=1.0)
+    keep, t = soak(f, SHELF, 3.0)
     assert keep is False
 
-
-def test_the_measured_failure_mode_would_defeat_iou_matching():
-    """Pins the diagnosis itself: these boxes share a centre but score poorly on
-    IoU, which is precisely why matching moved off it."""
-    big = (SHELF[0] - 60, SHELF[1] - 60, SHELF[2] + 60, SHELF[3] + 60)
-    assert iou(SHELF, big) < 0.80           # IoU says "different object"
-    assert centre_offset(SHELF, big) < 0.15  # centre says "same place"
+    assert f.step([("cell phone", SHELF)], FRAME, now=t + 5.0)[0] is True
 
 
-def test_slow_drift_is_never_called_static():
-    """Staticness is measured from where the streak began, not the last frame.
-    Otherwise a phone creeping across the desk would look static at every step
-    and be suppressed while plainly moving."""
-    f = StaticRegionFilter(static_after=10)
-    for i in range(40):
-        box = (300.0 + i * 6, 250.0, 420.0 + i * 6, 530.0)   # 6px per frame
-        assert f.step([("cell phone", box)])[0] is True
-
-
-def test_track_is_forgotten_after_absence():
-    """Gone long enough, then back -> a fresh streak, so it is reported again."""
-    f = StaticRegionFilter(static_after=10, forget_after=5)
-    assert run(f, SHELF, 20) is False
-
-    for _ in range(6):                      # absent past forget_after
-        f.step([])
-
-    assert f.step([("cell phone", SHELF)])[0] is True
-
-
-def test_brief_miss_does_not_reset_the_streak():
-    """One dropped frame must not undo a streak that took 2s to build."""
-    f = StaticRegionFilter(static_after=10, forget_after=5)
-    run(f, SHELF, 20)
-    f.step([])                              # single missed frame
-    assert f.step([("cell phone", SHELF)])[0] is False
+def test_a_dropped_frame_does_not_undo_progress():
+    f = StaticRegionFilter(static_seconds=2.0, forget_seconds=1.0)
+    keep, t = soak(f, SHELF, 3.0)
+    assert keep is False
+    assert f.step([("cell phone", SHELF)], FRAME, now=t + 0.3)[0] is False
 
 
 # --- scope -----------------------------------------------------------------
 
 def test_person_is_never_suppressed():
-    """A candidate sitting still is the NORMAL case -- suppressing them would
-    break the whole app, so `person` must not be governed by this filter."""
-    f = StaticRegionFilter(static_after=10)
-    for _ in range(100):
-        assert f.step([("person", (100.0, 100.0, 500.0, 700.0))])[0] is True
+    """A candidate sitting still is the NORMAL case; suppressing them would
+    break the entire app."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    for i in range(100):
+        keep = f.step([("person", (100.0, 100.0, 500.0, 700.0))], FRAME, now=i * 0.1)
+        assert keep[0] is True
 
 
 def test_book_is_not_suppressed_by_default():
-    """A book lying open on the desk is static AND genuinely present."""
-    f = StaticRegionFilter(static_after=10)
-    assert run(f, SHELF, 50, label="book") is True
+    """A book lying open on a desk is static AND genuinely present."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    assert soak(f, SHELF, 5.0, label="book")[0] is True
 
 
-def test_two_static_objects_tracked_independently():
-    f = StaticRegionFilter(static_after=10)
-    for _ in range(20):
-        keep = f.step([("cell phone", SHELF), ("cell phone", PHONE)])
-    assert keep == [False, False]
-    assert f.suppressed_count == 2
+def test_empty_frame_is_handled():
+    f = StaticRegionFilter()
+    assert f.step([], FRAME, now=0.0) == []
