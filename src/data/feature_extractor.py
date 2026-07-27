@@ -17,6 +17,7 @@ import mediapipe as mp
 from ultralytics import YOLO
 
 from src.detection.class_ids import resolve_class_ids
+from src.detection.weights import ensure_finetuned_weights
 from src.features.gaze_estimation import estimate_gaze, gaze_ratio
 from src.features.eye_analysis import calculate_ear
 from src.features.head_pose import calculate_head_pose
@@ -82,6 +83,8 @@ class FeatureExtractor:
         # measured at recall 0.064 on real proctoring frames -- it logged a
         # phone in ~6% of the frames that had one, which is why the Phase 1
         # phone model learned head-down posture as a proxy instead.
+        if yolo_weights is None:
+            ensure_finetuned_weights()      # no-op once it's on disk
         self._weights = yolo_weights or detector_weights()
         self._yolo = YOLO(self._weights)
         self.object_conf = object_conf if object_conf is not None else phone_conf()

@@ -1,0 +1,17 @@
+# Dependencies for the Hugging Face Space. Deliberately NOT the repo's
+# requirements.txt -- two things differ, and both matter:
+#
+# 1. opencv-python-headless, not opencv-python. A Space has no display server,
+#    and the GUI build fails on the missing libGL shared object. Locally the
+#    normal build is required instead, because main.py calls cv2.imshow.
+# 2. No scikit-learn / joblib. Nothing left in the app trains or loads a
+#    scikit-learn model, and a Space that installs less starts faster.
+
+opencv-python-headless
+mediapipe
+numpy
+pandas
+ultralytics
+huggingface_hub
+pyyaml
+streamlit

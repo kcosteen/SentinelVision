@@ -1,20 +1,31 @@
-# Core computer-vision pipeline
+# PyTorch from its CPU-only index. Ultralytics depends on torch, and pip's
+# default is the CUDA build -- roughly 2.5 GB of GPU libraries that are dead
+# weight here: no machine this runs on has an NVIDIA GPU, and free hosting tiers
+# measure memory in hundreds of megabytes. The CPU wheels are ~200 MB and behave
+# identically for our purposes. This is an EXTRA index, so anything not found
+# there still resolves from PyPI as usual.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+
+# Core computer-vision pipeline.
+#
+# opencv-python (not -headless) because main.py calls cv2.imshow for the live
+# window. On a headless Linux host that build still needs libGL and friends,
+# which is what packages.txt installs. The Hugging Face Space uses the headless
+# build instead -- see deploy/space/requirements.txt.
 opencv-python
 mediapipe
 numpy
 
-# Real-time object detection (YOLOv8)
+# Fine-tuned object detection
 ultralytics
 
-# Data wrangling for the Phase 1 training dataset (windowed feature aggregation)
+# Per-window aggregation in the demo's analysis path
 pandas
 
-# Phase 1 model training + evaluation
-scikit-learn
-joblib
-
-# Phase 2: downloading public detection datasets from the Hugging Face Hub,
-# and reading the data.yaml class lists that ship with Roboflow YOLO exports
+# Fetching the fine-tuned detector from the Hub at runtime, and reading the
+# data.yaml class lists that ship with Roboflow YOLO exports
 huggingface_hub
 pyyaml
 

@@ -17,6 +17,7 @@ from datetime import datetime
 from ultralytics import YOLO
 
 from src.detection.class_ids import resolve_class_ids
+from src.detection.weights import ensure_finetuned_weights
 from src.object_detection.static_filter import StaticRegionFilter, held_by_person
 from src.thresholds import detector_weights, phone_conf, using_finetuned
 
@@ -38,6 +39,11 @@ def _ensure_log():
 
 
 _ensure_log()
+
+# Pull the fine-tune from the Hub if this checkout doesn't have it. Must happen
+# BEFORE detector_weights() is consulted -- that call is a plain os.path.exists,
+# so without this a fresh clone silently runs on the far weaker COCO baseline.
+ensure_finetuned_weights()
 
 model = YOLO(detector_weights())
 
