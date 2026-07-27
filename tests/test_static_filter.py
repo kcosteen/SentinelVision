@@ -140,12 +140,56 @@ def test_centre_jitter_across_a_cell_boundary_still_matures():
 
 # --- forgetting ------------------------------------------------------------
 
-def test_region_is_forgotten_after_a_long_absence():
-    f = StaticRegionFilter(static_seconds=2.0, forget_seconds=1.0)
+def test_occlusion_does_not_make_the_filter_relearn():
+    """Reported from the real camera: sitting forward occludes the shelf, so
+    nothing is detected there; leaning back reveals it again and it flagged EVERY
+    time. A 1s forget window was wiping everything already learned. Furniture
+    does not stop being furniture because somebody leaned in front of it."""
+    f = StaticRegionFilter(static_seconds=2.0, forget_seconds=1.0,
+                           remember_seconds=60.0)
+    keep, t = soak(f, SHELF, 3.0)
+    assert keep is False, "learned while leaning back"
+
+    # Lean forward for 12s -- shelf fully occluded, no detections at all.
+    for i in range(120):
+        f.step([], FRAME, now=t + i * 0.1)
+
+    # Lean back: it must be remembered, not relearned.
+    assert f.step([("cell phone", SHELF)], FRAME, now=t + 12.5)[0] is False
+
+
+def test_repeated_lean_cycles_never_flag():
+    """The actual reported symptom, repeated."""
+    f = StaticRegionFilter(static_seconds=2.0)
     keep, t = soak(f, SHELF, 3.0)
     assert keep is False
 
-    assert f.step([("cell phone", SHELF)], FRAME, now=t + 5.0)[0] is True
+    for cycle in range(5):
+        for i in range(50):                      # ~5s occluded
+            f.step([], FRAME, now=t + i * 0.1)
+        t += 5.0
+        assert f.step([("cell phone", SHELF)], FRAME, now=t)[0] is False, cycle
+
+
+def test_shifted_box_centre_still_reads_as_known_scenery():
+    """Leaning back reveals more of the shelf, moving the detector's box centre
+    by more than one cell. Confirmed scenery has to cover that."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    keep, t = soak(f, SHELF, 3.0)
+    assert keep is False
+
+    cell = max(FRAME) * f.cell_ratio
+    shifted = (SHELF[0] - cell, SHELF[1], SHELF[2] + cell, SHELF[3])
+    assert f.step([("cell phone", shifted)], FRAME, now=t + 0.2)[0] is False
+
+
+def test_region_is_forgotten_after_a_very_long_absence():
+    """Memory is long, not infinite -- move the furniture and it re-evaluates."""
+    f = StaticRegionFilter(static_seconds=2.0, remember_seconds=60.0)
+    keep, t = soak(f, SHELF, 3.0)
+    assert keep is False
+
+    assert f.step([("cell phone", SHELF)], FRAME, now=t + 120.0)[0] is True
 
 
 def test_a_dropped_frame_does_not_undo_progress():

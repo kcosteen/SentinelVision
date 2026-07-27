@@ -66,9 +66,29 @@ DEFAULT_CELL_RATIO = 0.05
 # Seconds a cell must stay occupied before it counts as scenery.
 DEFAULT_STATIC_SECONDS = 2.0
 
-# Seconds a cell survives unoccupied. Absorbs the detector dropping a frame or
-# two without discarding progress that took `static_seconds` to build.
+# Seconds an UNCONFIRMED cell survives unoccupied. Short on purpose: a phone
+# drifting through a cell must not leave credit behind that later matures.
 DEFAULT_FORGET_SECONDS = 1.0
+
+# Seconds a CONFIRMED region is remembered after it was last seen. Long on
+# purpose, and the fix for a bug found on the real camera: sitting forward, the
+# user's head and shoulders occlude the shelf, so nothing is detected there and a
+# 1s forget window wiped everything the filter had learned. Leaning back revealed
+# the shelf into cells with no history, which warmed up from scratch and flagged
+# every single time.
+#
+# "I have not seen it lately" is not "it is gone". Furniture does not stop being
+# furniture because somebody leaned in front of it, so once a region has proven
+# itself static it stays known through occlusion, re-framing and brief absence.
+DEFAULT_REMEMBER_SECONDS = 60.0
+
+# How many cells out to look when deciding whether a detection sits in known
+# scenery. The visible extent of a large object changes as the user moves --
+# leaning back reveals more shelf, which shifts the detector's box centre by more
+# than one cell -- so confirmed scenery casts a slightly wider shadow than the
+# single cell it was learned in. Still far narrower than the gap between the
+# shelf and where a phone is held up in front of the face.
+DEFAULT_NEIGHBOURHOOD = 2
 
 # Only classes where "not moving" genuinely implies "not behaviour".
 DEFAULT_LABELS = frozenset({"cell phone"})
@@ -110,10 +130,14 @@ class StaticRegionFilter:
     def __init__(self, cell_ratio=DEFAULT_CELL_RATIO,
                  static_seconds=DEFAULT_STATIC_SECONDS,
                  forget_seconds=DEFAULT_FORGET_SECONDS,
+                 remember_seconds=DEFAULT_REMEMBER_SECONDS,
+                 neighbourhood=DEFAULT_NEIGHBOURHOOD,
                  labels=DEFAULT_LABELS):
         self.cell_ratio = cell_ratio
         self.static_seconds = static_seconds
         self.forget_seconds = forget_seconds
+        self.remember_seconds = remember_seconds
+        self.neighbourhood = neighbourhood
         self.labels = frozenset(labels)
         self._cells = {}
 
@@ -147,40 +171,62 @@ class StaticRegionFilter:
         return (label, int(cx // cell_px), int(cy // cell_px))
 
     def _mark(self, key, now):
-        """Record that this cell is occupied, extending or restarting its run."""
+        """Record that this cell is occupied, extending or restarting its run.
+
+        A run only restarts if the cell was NOT already confirmed. Once a region
+        has proven itself static, an occlusion must not demote it back to
+        "unknown" and force it to re-earn its status -- that was the lean-back
+        bug.
+        """
         cell = self._cells.get(key)
-        if cell is None or now - cell["last"] > self.forget_seconds:
-            cell = {"since": now, "last": now}      # fresh run
+
+        if cell is None or self._is_stale(cell, now):
+            cell = {"since": now, "last": now, "confirmed": False}
         else:
-            cell["last"] = now
+            cell["last"] = now                      # continue the run
+
+        if not cell["confirmed"] and now - cell["since"] >= self.static_seconds:
+            cell["confirmed"] = True
+
         self._cells[key] = cell
 
-    def _is_scenery(self, key, now):
-        """True when this cell -- or one touching it -- has been busy long enough.
+    def _is_stale(self, cell, now):
+        """Past its patience: confirmed scenery gets a much longer leash.
 
-        Neighbours count because a centre sitting near a cell boundary would
-        otherwise alternate between two cells and neither would ever mature.
+        Confirmed cells expire too, just slowly. Memory that never lapsed would
+        mean rearranging the room left permanent blind spots where the detector
+        could never report a phone again.
+        """
+        limit = self.remember_seconds if cell["confirmed"] else self.forget_seconds
+        return now - cell["last"] > limit
+
+    def _is_scenery(self, key, now):
+        """True when this cell, or one near it, is known scenery.
+
+        Neighbours count for two reasons: a centre resting on a cell boundary
+        would otherwise alternate between two cells and neither would mature, and
+        a large object's detected extent shifts as the user moves, which walks
+        the box centre across cell lines.
         """
         label, ix, iy = key
-        for dx in (-1, 0, 1):
-            for dy in (-1, 0, 1):
+        reach = range(-self.neighbourhood, self.neighbourhood + 1)
+
+        for dx in reach:
+            for dy in reach:
                 cell = self._cells.get((label, ix + dx, iy + dy))
-                if cell is None:
-                    continue
-                if (now - cell["last"] <= self.forget_seconds
-                        and now - cell["since"] >= self.static_seconds):
+                if (cell is not None and cell["confirmed"]
+                        and not self._is_stale(cell, now)):
                     return True
         return False
 
     def _prune(self, now):
+        """Forget stale cells -- confirmed scenery on a much longer leash."""
         self._cells = {
             key: cell for key, cell in self._cells.items()
-            if now - cell["last"] <= self.forget_seconds
+            if not self._is_stale(cell, now)
         }
 
     @property
     def suppressed_count(self):
-        """Cells currently classed as scenery (for the HUD / diagnostics)."""
-        now = time.time()
-        return sum(1 for c in self._cells.values()
-                   if now - c["since"] >= self.static_seconds)
+        """Regions currently classed as scenery (for the HUD / diagnostics)."""
+        return sum(1 for c in self._cells.values() if c["confirmed"])
