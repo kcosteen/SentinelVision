@@ -34,18 +34,20 @@ def using_finetuned():
     return os.path.exists(FINETUNED_WEIGHTS)
 
 
-# CALIBRATED for the fine-tuned model, on 700 held-out proctoring images:
+# CALIBRATED for the fine-tuned model, on the FULL 1,822-image held-out split:
 #   python -m src.calibration.calibrate_phone_conf \
 #       --weights models/detection/proctoring_yolov8n_best.pt --finetuned \
 #       --export-root data/detection/external/roboflow_online_proctoring --split valid
-# Best F1 0.923 at 0.35 (precision 0.909, recall 0.936). The curve is flat from
-# 0.25-0.50, so this is a plateau rather than a knife edge.
+# Best F1 0.927 at 0.35 (precision 0.910, recall 0.944). The curve is flat from
+# 0.25-0.50 (0.917 -> 0.925), so this is a plateau rather than a knife edge.
+# 64% of those images contain no phone at all, so the precision is measured
+# against real chances to hallucinate rather than a flattering subset.
 PHONE_CONF = 0.35
 
-# The same sweep on the PRE-TRAINED model peaked at f1 0.193 -- the baseline is
-# so weak that no threshold rescues it. Kept only so the fallback path isn't
-# silently using a value calibrated for a different model.
-PHONE_CONF_BASELINE = 0.15
+# The same sweep on the PRE-TRAINED model peaked at f1 0.203, at conf 0.10 --
+# the baseline is so weak that no threshold rescues it. Kept only so the fallback
+# path isn't silently using a value calibrated for a different model.
+PHONE_CONF_BASELINE = 0.10
 
 # Other objects have not been calibrated individually. They share the phone's
 # value for now, which is a guess, not a measurement.

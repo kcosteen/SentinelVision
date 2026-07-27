@@ -55,9 +55,9 @@ Motivated by a measured failure, not a hunch.
       the export's own split drew 100% of val from one video that was 87% of the data
 - [x] AP@0.5 / IoU implemented from scratch + unit tested, so both models are
       scored apples-to-apples across differing class conventions
-- [x] **Fine-tuned and reported the delta:** F1 **0.193 → 0.923** on held-out
-      proctoring images
-- [x] Thresholds calibrated rather than guessed: phone conf **0.35** (F1 0.923),
+- [x] **Fine-tuned and reported the delta:** F1 **0.203 → 0.927** on 1,822
+      held-out proctoring images
+- [x] Thresholds calibrated rather than guessed: phone conf **0.35** (F1 0.927),
       head yaw **30°** (F1 0.869), EAR **0.23** (F1 0.979) — with the two that
       remain guesses labelled as such in `src/thresholds.py`
 - [x] Measured the fine-tune on an unseen camera and reported the bad news:

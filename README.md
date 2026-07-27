@@ -22,7 +22,7 @@ with a risk status.
 
 | What | Result | How it was measured |
 |---|---|---|
-| **Fine-tuned the phone detector** ([weights ↗](https://huggingface.co/kcosteen/sentinelvision-proctoring-yolov8n)) | F1 **0.193 → 0.923** | Both models scored by the same from-scratch AP/F1 code on the same held-out images |
+| **Fine-tuned the phone detector** ([weights ↗](https://huggingface.co/kcosteen/sentinelvision-proctoring-yolov8n)) | F1 **0.203 → 0.927** | Both models scored by the same from-scratch AP/F1 code on the same held-out images |
 | **Calibrated the decision thresholds** | 3 of 5 measured; the other 2 labelled as guesses | Swept against public labelled datasets, not picked by eye |
 | **Diagnosed a domain-shift failure** | 56.4% false-positive rate on an unseen camera | 741 phone-free frames; then fixed structurally, not by tuning |
 | **Test coverage** | 132 passing | Pure logic isolated from models, so it runs without a camera |
@@ -82,8 +82,8 @@ public, so every number here is reproducible.
 
 | Model | Precision | Recall | **F1** |
 |---|---:|---:|---:|
-| Pre-trained YOLOv8n (COCO) | 0.215 | 0.176 | **0.193** |
-| **Fine-tuned** | 0.909 | 0.936 | **0.923** |
+| Pre-trained YOLOv8n (COCO) | 0.215 | 0.192 | **0.203** |
+| **Fine-tuned** | 0.910 | 0.944 | **0.927** |
 
 Two details make that number trustworthy:
 
@@ -105,7 +105,7 @@ command that produced it, so it can be re-derived or challenged — or UNCALIBRA
 
 | Threshold | Value | Measured against | Result |
 |---|---:|---|---|
-| Phone confidence | `0.35` | 700 held-out proctoring images | F1 **0.923**; flat 0.25–0.50, a plateau not a knife edge |
+| Phone confidence | `0.35` | 1,822 held-out proctoring images (64% phone-free) | F1 **0.927**; flat 0.25–0.50, a plateau not a knife edge |
 | Head yaw "looking away" | `30°` | 463 Gourier head-pose images with ground-truth angles | F1 **0.869** |
 | Eye Aspect Ratio "closed" | `0.23` | 1,999 labelled open/closed eyes | F1 **0.979**, Cohen's d **4.11** |
 | Iris gaze ratio | `0.35 / 0.65` | — | **UNCALIBRATED** — no public dataset with usable ground truth |
@@ -128,7 +128,7 @@ phone-free frames** — every false positive the same wall shelf. Live it scored
 confidence threshold separates them; a blank-background control confirmed the
 shelf was the sole source.
 
-The public set's 0.909 precision was a statement about the public set, not about
+The public set's 0.910 precision was a statement about the public set, not about
 that room. Textbook domain shift.
 
 **Fixed structurally rather than by tuning.** A shelf is bolted to the wall; a
@@ -185,7 +185,7 @@ altered pixels dropped `person` from 0.63 to no detection at all.
 | Looking away | +10 | head yaw ≥ 30° — calibrated, F1 0.869 |
 | No face detected | +20 | MediaPipe face count |
 | Multiple people detected | +40 | MediaPipe face count |
-| Phone detected | +50 | fine-tuned YOLOv8n — F1 0.923 |
+| Phone detected | +50 | fine-tuned YOLOv8n — F1 0.927 |
 
 Weights track how much each signal is **trusted**, not only how bad the behaviour
 is. A 10-second cooldown per event stops one continuous behaviour inflating the

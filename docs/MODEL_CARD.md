@@ -24,7 +24,7 @@ webcam proctoring app.
 Stock COCO YOLOv8n is poor at this task. Phones in exam footage are small, dim,
 hand-occluded and shot through a cheap webcam — nothing like the clean, centred
 phones in COCO. Measured on held-out proctoring images, the pre-trained model
-reaches an F1 of **0.193**, and no confidence threshold rescues it. That is a
+reaches an F1 of **0.203**, and no confidence threshold rescues it. That is a
 model problem, not a tuning problem, which is what motivated fine-tuning.
 
 ## Results
@@ -36,12 +36,13 @@ other's.
 
 | Model | Precision | Recall | **F1** |
 |---|---:|---:|---:|
-| Pre-trained YOLOv8n (COCO) | 0.215 | 0.176 | **0.193** |
-| **This model** | 0.909 | 0.936 | **0.923** |
+| Pre-trained YOLOv8n (COCO) | 0.215 | 0.192 | **0.203** |
+| **This model** | 0.910 | 0.944 | **0.927** |
 
-Measured at confidence **0.35**, chosen by sweeping 0.05–0.95 against 700
-held-out images. The F1 curve is flat from 0.25–0.50, so that is a plateau rather
-than a knife edge.
+Measured at confidence **0.35**, chosen by sweeping 0.05–0.95 against the full
+**1,822-image** held-out split. The F1 curve is flat from 0.25–0.50, so that is a
+plateau rather than a knife edge. **64% of those images contain no phone at all**,
+so precision is measured against genuine opportunities to hallucinate.
 
 ## Classes
 
@@ -88,7 +89,7 @@ Live it scored that shelf **0.60–0.71**, against a real phone at **0.72–0.79
 the ranges *touch*, so no confidence threshold separates them. A blank-background
 control confirmed the shelf was the sole source.
 
-The 0.909 precision above is a statement about the public validation set, not
+The 0.910 precision above is a statement about the public validation set, not
 about any particular room. This is textbook domain shift, and it is the single
 most important thing to know before using these weights.
 

@@ -132,14 +132,14 @@ else's capture setup is exactly the mistake documented in §7.**
 
 Stock COCO YOLOv8n is poor at this: exam-webcam phones are small, dim,
 hand-occluded and shot through cheap optics, nothing like COCO's clean centred
-phones. Measured on held-out proctoring images it reaches **F1 0.193**, and no
+phones. Measured on 1,822 held-out proctoring images it reaches **F1 0.203**, and no
 confidence threshold rescues it — that is a *model* problem, not a tuning one,
 which is what justified fine-tuning.
 
 | Model | Precision | Recall | **F1** |
 |---|---:|---:|---:|
-| Pre-trained YOLOv8n (COCO) | 0.215 | 0.176 | **0.193** |
-| **Fine-tuned** | 0.909 | 0.936 | **0.923** |
+| Pre-trained YOLOv8n (COCO) | 0.215 | 0.192 | **0.203** |
+| **Fine-tuned** | 0.910 | 0.944 | **0.927** |
 
 - **Single-stage detector:** YOLO predicts boxes and classes in one pass, which
   is what makes it fast enough for live video (vs. two-stage detectors like
@@ -172,7 +172,7 @@ frames**. Every false positive was the same wall shelf. Live it scored that shel
 confidence threshold separates them.** A blank-background control confirmed the
 shelf was the sole source.
 
-The public set's 0.909 precision was a statement about the public set, not about
+The public set's 0.910 precision was a statement about the public set, not about
 that room. **This is textbook domain shift**, and it is why a single headline
 metric is never enough.
 
@@ -216,7 +216,7 @@ computer and 10s on another.
 | Looking away | +10 | calibrated, F1 0.869 |
 | No face detected | +20 | face count |
 | Multiple people detected | +40 | face count |
-| Phone detected | +50 | calibrated, F1 0.923 |
+| Phone detected | +50 | calibrated, F1 0.927 |
 
 - **Cooldown = debouncing.** A 10-second per-event cooldown stops one continuous
   behaviour (looking away for 3s = 90 frames) being counted 90 times. Standard
@@ -250,7 +250,7 @@ all three, so the distinction is concrete rather than theoretical.
   your own labelled images, so its weights adapt to your domain. It reuses
   everything the model already knows about generic objects and only nudges it
   toward your specialty — far cheaper than training from scratch. *Done for the
-  detector: F1 0.193 → 0.923, with the backbone frozen because a dataset this
+  detector: F1 0.203 → 0.927, with the backbone frozen because a dataset this
   size would otherwise mostly memorise.*
 - **Training a new model** — learning the parameters of a new model from scratch
   on your data. *Not done here.* An earlier attempt trained a behaviour
