@@ -1,10 +1,9 @@
 """Find the Eye Aspect Ratio at which an eye should count as closed.
 
-`EAR_THRESHOLD = 0.20` appears in both `blink_detection.py` and
-`feature_extractor.py`. It's the value from the original EAR paper, which is a
-reasonable starting point but was not measured on our pipeline, our landmark
-detector, or anyone's face in particular. Since every blink count downstream
-depends on it, it's worth measuring.
+`EAR_CLOSED` in `src/thresholds.py` was 0.20, the value from the original EAR
+paper. A reasonable starting point, but never measured on our pipeline, our
+landmark detector, or anyone's face in particular. Since every blink count
+downstream depends on it, it's worth measuring.
 
     # Download, measure, and sweep (start small -- 2000 images is plenty):
     python -m src.calibration.calibrate_ear --limit 2000
@@ -46,7 +45,7 @@ DATASET_REPO = "MichalMlodawski/closed-open-eyes"
 # The value both modules use today.
 CURRENT_EAR_THRESHOLD = 0.20
 
-# MediaPipe face-mesh indices, matching blink_detection.py / feature_extractor.py.
+# MediaPipe face-mesh indices, matching src/data/feature_extractor.py.
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 

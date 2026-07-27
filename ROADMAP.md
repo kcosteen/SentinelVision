@@ -43,8 +43,8 @@ in only **20.7%** of frames from our own `phone_*` clips, which is why the Phase
       class lists onto ours and dropping out-of-scope classes
 - [x] Dataset pipeline: COCO→YOLO conversion, merge public + our own frames,
       clip-grouped split (`src/detection/prepare_dataset.py`)
-- [x] Targeted frame extraction — keep the frames the baseline *missed*, so
-      annotation effort goes to the blind spot (`src/detection/extract_frames.py`)
+- [x] Leak-free splitting by source video (`src/detection/split_by_source.py`) —
+      the export's own split drew 100% of val from one video that was 87% of the data
 - [x] AP@0.5 / IoU implemented from scratch + unit tested, so the baseline
       comparison is apples-to-apples across differing class ids
 - [x] Baseline measured: **AP@0.5 0.432, precision 0.761, recall 0.406**
@@ -56,8 +56,11 @@ in only **20.7%** of frames from our own `phone_*` clips, which is why the Phase
 - [x] Measured the fine-tune on our OWN footage and reported the bad news:
       **56.4%** false-positive rate on 741 phone-free frames, all of them one
       piece of background furniture. Public precision did not transfer.
-- [ ] _Deferred:_ annotate own frames as hard negatives to close that gap —
-      see [`docs/ANNOTATION_GUIDE.md`](docs/ANNOTATION_GUIDE.md)
+- [x] Fixed it structurally instead: an occupancy-grid static-region filter
+      (`src/object_detection/static_filter.py`), after three designs were
+      rejected on measurements — see the README for that debugging arc
+- [ ] _Deferred:_ hard negatives from the deployment environment, which remains
+      the honest fix rather than a filter
 
 **Skills shown:** transfer learning, mAP/F1 evaluation, threshold calibration,
 leak-free splitting, and diagnosing domain shift in your own model.

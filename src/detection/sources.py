@@ -20,7 +20,7 @@ is not fixed by adding more *clean* phone photos: public phone datasets are
 mostly well-lit, centred, unoccluded product-ish shots, whereas our failure mode
 is a dim webcam, a phone half-hidden by a hand, at lap level, motion-blurred.
 Mixing in self-labelled frames from our own clips is therefore not a nice-to-have
--- it is the part that closes the gap. See `extract_frames.py`.
+-- it is the part that closes the gap.
 """
 
 # Each entry: what it is, how to get it, and the honest caveat.

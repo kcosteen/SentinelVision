@@ -19,10 +19,9 @@ a lie: the model ranked the *actual* phone features (`phone_frac`,
 `phone_conf_*`) dead last and was really predicting from `head_pitch_mean` and
 `gaze_ratio_std` — head-down-at-lap posture. It had learned a proxy, not a phone.
 
-The root cause is measurable: **pre-trained YOLOv8-nano detects the phone in only
-20.7% of sampled frames from our own `phone_*` clips** (measured by
-`python -m src.detection.extract_frames --strategy missed --dry-run`; 192 misses
-out of 242 frames). A behaviour model can't use a signal that isn't there.
+The root cause is measurable: **pre-trained YOLOv8-nano detected the phone in
+only 20.7% of sampled frames from webcam clips** — 192 misses out of 242. A
+behaviour model can't use a signal that isn't there.
 
 So Phase 2 needs phone images with bounding boxes, ideally shot through a webcam
 at a desk.
@@ -149,11 +148,13 @@ Averaging them would hide the result behind the easy half of the data.
 
 ### Spending annotation effort where it pays
 
-Annotation is human time, so `extract_frames.py` defaults to
-`--strategy missed`: it keeps frames from clips we've *already labelled* as
-containing a phone where the baseline detector found nothing. Those are false
-negatives by construction — the model's blind spot, labelled for free by the
+Annotation is human time, so the frames worth labelling are the ones the baseline
+detector *missed* in clips already known to contain a phone. Those are false
+negatives by construction — the model's blind spot, identified for free by the
 clip-level label. A frame the detector already nails teaches it almost nothing.
+
+This is active-learning-style sample selection, and it applies to any deployment
+environment where the detector underperforms.
 
 This is the cheap end of active learning (uncertainty sampling with the clip
 label as oracle). The honest caveat: training only on hard examples biases the
@@ -173,11 +174,11 @@ spread is a data-collection finding, not just a modelling one — whatever pose
 
 This currently yields **201 frames** awaiting annotation in
 `data/detection/raw_frames/` (gitignored — they're cut from private footage),
-alongside a `manifest.csv` recording each frame's baseline confidence.
+alongside a manifest recording each frame's baseline confidence.
 
-The labelling protocol — what counts as a phone box under occlusion, why a frame
-with no visible phone gets an *empty* label rather than a guess, and how to verify
-before training — is in [`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md).
+Two labelling rules matter more than the tool used: a frame with no visible phone
+gets an *empty* label rather than a guess, and frames from one clip must never
+straddle the train/val boundary.
 
 ---
 
@@ -228,7 +229,7 @@ sources.py            registry: what exists, licence, caveat
    │
 roboflow_import.py    ROBOFLOW_API_KEY ──► YOLO export ──► data/detection/external/
    │
-extract_frames.py     our clips ──► frames the baseline missed ──► annotate (Roboflow/CVAT/labelImg)
+(annotation)          own clips ──► frames the baseline missed ──► label (Roboflow/CVAT/labelImg)
    │
 prepare_dataset.py    HF COCO JSON ────┬─► YOLO layout + data.yaml
                       Roboflow export ─┤   (classes remapped, unknowns dropped,
@@ -237,9 +238,10 @@ prepare_dataset.py    HF COCO JSON ────┬─► YOLO layout + data.yaml
 train_detector.py     fine-tune ──► score vs baseline with our own AP code
 ```
 
-The clip-grouped split is the same rule as `build_dataset.py` in Phase 1, for the
-same reason: consecutive frames of one clip are near-duplicates, so letting them
-straddle train/val leaks the answer and reports a mAP we haven't earned.
+The clip-grouped split exists because consecutive frames of one clip are
+near-duplicates: letting them straddle train/val leaks the answer and reports a
+mAP we haven't earned. `split_by_source.py` applies the same rule to the public
+set, where one source video was 87% of the data and 100% of validation.
 
 ---
 

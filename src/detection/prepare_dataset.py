@@ -25,7 +25,7 @@ Design choices worth defending in an interview:
   `book` head we never read would only dilute the gradient and the mAP. Classes
   live in `CLASSES` so adding one later is a single edit, not a refactor.
 * **Our own frames split by CLIP, never by frame.** Identical to the grouped
-  split in `build_dataset.py`, and for the same reason: consecutive frames from
+  split, and for the same reason: consecutive frames from
   one clip are near-duplicates, so letting them straddle train/val leaks the
   answer and reports a mAP we haven't earned. Public images have no clip, so they
   split randomly under a fixed seed.
@@ -418,7 +418,7 @@ def main():
     if not public_items and not own_items and not args.dry_run:
         raise SystemExit(
             "Nothing to build. Either allow public data (drop --no-public) or "
-            "annotate frames first (python -m src.detection.extract_frames)."
+            "add annotated frames under --own-dir first."
         )
 
     public_train, public_val = split_public(public_items, args.val_fraction, args.seed)

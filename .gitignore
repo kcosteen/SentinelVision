@@ -38,3 +38,6 @@ __pycache__/
 # Editor / tooling settings (local, machine-specific)
 .vscode/
 .claude/settings.local.json
+# Session output -- recorded events and detections from real runs.
+# The code recreates the directory and headers on first use.
+/logs/

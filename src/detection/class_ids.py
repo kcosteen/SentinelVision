@@ -9,9 +9,8 @@ Hard-coding an id is uniquely nasty here because the failure is **silent and
 plausible**: asking a six-class model for class 67 matches nothing, so the
 pipeline reports "no phone in any frame" and looks like a detector that failed
 rather than a lookup that was wrong. That mistake has been fixed one file at a
-time (`extract_frames.py`, then `calibrate_phone_conf.py`), each with its own
-copy of the same name set -- which is how the copies drifted. This module is the
-one place that knowledge lives.
+time, each with its own copy of the same name set -- which is how the copies
+drifted. This module is the one place that knowledge lives.
 
 Deliberately dependency-free (no ultralytics, no cv2) so any module can import it.
 """

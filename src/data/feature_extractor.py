@@ -30,7 +30,8 @@ from src.thresholds import (
 )
 
 
-# Eye-landmark indices for EAR -- must match src/vision/blink_detection.py.
+# Eye-landmark indices for EAR, as used by src/calibration/calibrate_ear.py
+# when it swept the threshold -- the two must agree or the number doesn't apply.
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 

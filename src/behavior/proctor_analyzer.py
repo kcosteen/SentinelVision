@@ -24,6 +24,7 @@ import time
 from src.thresholds import (
     HEAD_YAW_LOOKING_AWAY,
     SCORE_DECAY_PER_SEC,
+    STARTUP_GRACE_SECONDS,
     SCORE_HIGH_RISK,
     SCORE_SUSPICIOUS,
 )
@@ -40,6 +41,8 @@ class ProctorAnalyzer:
 
         # Wall-clock of the last decay step. Injectable so tests need no sleeps.
         self._last_decay = now if now is not None else time.time()
+
+        self.started_at = self._last_decay
 
 
     def add_score(self, event, now=None):
@@ -75,6 +78,18 @@ class ProctorAnalyzer:
 
 
         return points
+
+
+    def is_calibrating(self, now=None):
+        """True while the scene is still being learned; don't judge yet.
+
+        The static filter needs a couple of seconds to work out which parts of
+        the frame are furniture, and until it has, background clutter WILL be
+        reported. Scoring during that window guarantees a false "Phone detected"
+        as the first thing anyone sees.
+        """
+        current_time = now if now is not None else time.time()
+        return current_time - self.started_at < STARTUP_GRACE_SECONDS
 
 
     def decay(self, now=None):

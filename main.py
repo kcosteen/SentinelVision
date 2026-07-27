@@ -79,16 +79,21 @@ def main():
         # Bleed the score down first, so a stale flag stops defining the run.
         analyzer.decay()
 
-        # Update suspicion score
-        for event in events:
+        # Watch, but don't judge, until the static filter has learned the scene.
+        calibrating = analyzer.is_calibrating()
 
-            points = analyzer.add_score(event)
+        if not calibrating:
 
-            log_event(
-                event,
-                points,
-                analyzer.score
-            )
+            # Update suspicion score
+            for event in events:
+
+                points = analyzer.add_score(event)
+
+                log_event(
+                    event,
+                    points,
+                    analyzer.score
+                )
 
         # ------------------------
         # Display information
@@ -116,7 +121,7 @@ def main():
             2
         )
 
-        status = analyzer.get_status()
+        status = "Calibrating scene..." if calibrating else analyzer.get_status()
 
         cv2.putText(
             frame,
@@ -129,7 +134,7 @@ def main():
         )
 
         y = 130
-        for event in events:
+        for event in ([] if calibrating else events):
             cv2.putText(
                 frame,
                 event,

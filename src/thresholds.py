@@ -129,3 +129,11 @@ SCORE_HIGH_RISK = 70
 # every `cooldown` (10s) for +50 and easily outruns the 20 points decay sheds in
 # that time -- so real behaviour still reaches High Risk and stays.
 SCORE_DECAY_PER_SEC = 2.0
+
+# Seconds the app watches without judging, while the static filter works out
+# which parts of the frame are furniture. Deliberately longer than that filter's
+# static_seconds (2.0): during its warm-up NOTHING has been learned yet, so
+# background clutter is guaranteed to be reported, and the very first thing a
+# new viewer would otherwise see is a false "Phone detected". A camera does its
+# white balance before it starts recording; same idea.
+STARTUP_GRACE_SECONDS = 3.0

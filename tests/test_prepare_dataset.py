@@ -4,7 +4,7 @@ Unit tests for the Phase 2 dataset assembly.
 The property under test is **no leakage**: frames cut from one clip are
 near-duplicates, so if any clip appears on both sides of the train/val split the
 reported mAP is inflated and meaningless. Same rule as the grouped split in
-build_dataset.py, tested for the same reason.
+the Phase 1 windowing code, tested for the same reason.
 """
 
 from src.detection.prepare_dataset import (
