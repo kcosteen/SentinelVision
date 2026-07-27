@@ -35,7 +35,7 @@ LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 
 # Both now come from src/thresholds.py, which records whether each was measured
-# or guessed. EAR_CLOSED is still a guess; the phone confidence below is not.
+# or guessed. EAR_CLOSED is calibrated (Cohen's d 4.11 between open and closed).
 EAR_THRESHOLD = EAR_CLOSED
 
 # Objects worth logging, BY NAME -- never by id. See src/detection/class_ids.py:

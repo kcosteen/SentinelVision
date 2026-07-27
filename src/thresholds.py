@@ -71,10 +71,22 @@ HEAD_YAW_LOOKING_AWAY = 30.0
 
 # --- Uncalibrated -----------------------------------------------------------
 
-# UNCALIBRATED. The value from the original EAR paper, never checked against our
-# landmarks or our camera. src/calibration/calibrate_ear.py is written but has
-# never been run.
-EAR_CLOSED = 0.20
+# CALIBRATED against 1,999 labelled eyes-open/closed face images (ODC-BY):
+#   python -m src.calibration.calibrate_ear --limit 2000
+# The two classes barely overlap -- Cohen's d 4.11, "well separated":
+#   closed  n=1199  mean 0.080   p90 0.164
+#   open    n= 800  mean 0.360   p10 0.287
+# So everything between ~0.16 and ~0.29 is no-man's-land, and the exact value
+# matters far less than being inside it. The F1 argmax is 0.25 (p 0.987 /
+# r 0.976 / f1 0.982) but precision starts dropping immediately above it -- 131
+# false positives by 0.30. 0.23 gives up 0.003 F1 (0.979) to sit nearer the
+# middle of the gap, so a modest EAR shift from a different camera doesn't cross
+# it. Picking the argmax of a curve measured on someone else's capture setup is
+# the exact mistake documented for the phone detector in README.
+# The old value, 0.20 from the original EAR paper, scored f1 0.968.
+EAR_CLOSED = 0.23
+
+# UNCALIBRATED. How many consecutive closed frames count as one blink.
 BLINK_MIN_FRAMES = 2
 
 # UNCALIBRATED. Hand-picked iris-position ratios. No public gaze dataset was

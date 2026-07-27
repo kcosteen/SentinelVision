@@ -106,10 +106,22 @@ picked it). Two were measured:
 |---|---:|---|---|
 | Phone confidence | `0.35` | Swept 0.05–0.95 over 700 held-out proctoring images | F1 **0.923**; flat 0.25–0.50, so a plateau not a knife-edge |
 | Head yaw "looking away" | `30°` | Swept against 463 Gourier head-pose images whose filenames encode the true pan angle | F1 **0.869** (P 0.835 / R 0.905) |
+| Eye Aspect Ratio "closed" | `0.23` | Swept over 1,999 labelled open/closed eye images (ODC-BY) | F1 **0.979**; the classes barely overlap (Cohen's d **4.11**) |
 
 Because the yaw threshold is the measured one, it is what the analyzer actually
 decides on; the hand-picked iris-gaze cut-points are only a fallback for frames
 where no head pose could be solved.
+
+The EAR sweep is a good example of why the shape of the curve matters more than
+its argmax. F1 peaks at 0.25, but precision falls off a cliff just above it (131
+false positives by 0.30), while the open and closed distributions leave a wide
+empty gap from ~0.16 to ~0.29. `0.23` gives up 0.003 F1 to sit nearer the middle
+of that gap, so a modest shift from a different camera doesn't cross it — the
+same domain-shift trap documented below, avoided this time.
+
+The one threshold still **uncalibrated** is the iris-gaze pair (0.35/0.65): no
+public gaze dataset with usable ground truth turned up, and `src/thresholds.py`
+says so rather than implying it was measured.
 
 ### Honest limitations
 
