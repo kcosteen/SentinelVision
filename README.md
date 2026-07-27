@@ -128,10 +128,19 @@ says so rather than implying it was measured.
 Measuring your own model's failures is the point of the exercise, so:
 
 - **The detector's precision does not transfer to my camera.** On 741 phone-free
-  frames of my own webcam clips it still fires `cell phone` on **56.4%** of them.
-  Every false positive is the same wall shelf behind me. Public-set precision of
-  0.909 is a statement about the public set, not about my room — a textbook
-  domain shift. Fixing it needs hard negatives from my own environment.
+  frames of my own webcam clips it fires `cell phone` on **56.4%** of them — every
+  false positive the same wall shelf behind me, scoring **0.60–0.71** live against
+  a real phone's 0.72–0.79. Those ranges touch, so *no confidence threshold
+  separates them*; the public set's 0.909 precision is a statement about the
+  public set, not about my room. A textbook domain shift.
+
+  Mitigated structurally rather than by tuning: a shelf is bolted to the wall and
+  a phone in use is not, so `src/object_detection/static_filter.py` tracks each
+  box across frames and stops reporting one that has held the same pixels for ~2
+  seconds. No per-room configuration — it learns whatever is nailed down in front
+  of the camera. The cost is that a phone left motionless on the desk is ignored
+  until it moves, which is the moment that matters anyway. The real fix remains
+  hard negatives from the deployment environment.
 - **Phones at the frame edge are missed.** Held low and half out of shot, the
   detector scores them 0.09–0.16, below any usable threshold.
 - **The head-yaw rule is conservative by construction.** Zero false positives in

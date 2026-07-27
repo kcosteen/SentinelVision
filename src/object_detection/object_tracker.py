@@ -17,6 +17,7 @@ from datetime import datetime
 from ultralytics import YOLO
 
 from src.detection.class_ids import resolve_class_ids
+from src.object_detection.static_filter import StaticRegionFilter
 from src.thresholds import detector_weights, phone_conf, using_finetuned
 
 LOG_FILE = os.path.join("logs", "detections.csv")
@@ -47,6 +48,10 @@ CLASS_IDS = resolve_class_ids(model, INTERESTING)
 # background clutter in an unfamiliar room reads as `cell phone` around 0.35-0.53.
 CONF_THRESHOLD = phone_conf(live=True)
 
+# Confidence alone cannot separate this desk's wall shelf (0.60-0.71 live) from a
+# phone in use (0.72-0.79) -- the ranges touch. Motion can: see static_filter.
+_static_filter = StaticRegionFilter()
+
 _WHICH = (
     "fine-tuned"
     if using_finetuned()
@@ -60,23 +65,35 @@ print(f"[detector] tracking {[model.names[i] for i in CLASS_IDS]} "
 def detect_objects(frame):
     """Run detection on one frame.
 
-    Returns (raw_results, [{'label': str, 'confidence': float}]).
+    Returns (raw_results, [{'label': str, 'confidence': float, 'box': tuple}]).
+
+    Detections the static filter has learned to be scenery are dropped here, so
+    neither the analyzer nor the audit log ever sees them.
     """
     results = model(frame, classes=CLASS_IDS, verbose=False)
 
-    detected = []
+    candidates = []
     for box in results[0].boxes:
         confidence = float(box.conf[0])
         if confidence < CONF_THRESHOLD:
             continue
-
         label = model.names[int(box.cls[0])]
-        detected.append({"label": label, "confidence": confidence})
+        xyxy = tuple(float(v) for v in box.xyxy[0])
+        candidates.append({"label": label, "confidence": confidence, "box": xyxy})
 
-        if label in SUSPICIOUS:
+    keep = _static_filter.step([(c["label"], c["box"]) for c in candidates])
+
+    detected = []
+    for candidate, wanted in zip(candidates, keep):
+        if not wanted:
+            continue                       # background furniture, not behaviour
+        detected.append(candidate)
+
+        if candidate["label"] in SUSPICIOUS:
             with open(LOG_FILE, "a", newline="") as handle:
                 csv.writer(handle).writerow(
-                    [datetime.now(), label, round(confidence, 2)]
+                    [datetime.now(), candidate["label"],
+                     round(candidate["confidence"], 2)]
                 )
 
     return results, detected
