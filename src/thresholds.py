@@ -52,9 +52,33 @@ PHONE_CONF_BASELINE = 0.15
 OBJECT_CONF = PHONE_CONF
 
 
-def phone_conf():
-    """Confidence floor appropriate to whichever detector is loaded."""
-    return PHONE_CONF if using_finetuned() else PHONE_CONF_BASELINE
+# OPERATING POINT, not a calibration. 0.35 is the F1 optimum on the public
+# proctoring val set and stays the right default for measurement. Live in a real
+# room it is too low: dark rectangular background objects (a wall shelf, a
+# keyboard, a monitor edge) score as `cell phone` in the 0.34-0.53 band, so the
+# app cries phone continuously at a desk it has never seen. A real phone held up
+# to the camera scores 0.72-0.79, well clear of that.
+#
+# 0.60 sits in the gap. It costs recall on phones that are half out of frame --
+# those only reach 0.09-0.16 and were never detectable at any usable threshold
+# anyway -- and buys a demo that does not false-alarm on furniture.
+#
+# This is a judgement about ONE camera in ONE room, so it is deliberately not
+# called calibrated. The honest fix is hard negatives from the deployment
+# environment; see the limitations section in README.
+PHONE_CONF_LIVE = 0.60
+
+
+def phone_conf(live=False):
+    """Confidence floor appropriate to whichever detector is loaded.
+
+    `live=True` returns the stricter operating point used by the real-time app.
+    Measurement paths keep the calibrated value so reported numbers stay
+    comparable to everything already published.
+    """
+    if not using_finetuned():
+        return PHONE_CONF_BASELINE
+    return PHONE_CONF_LIVE if live else PHONE_CONF
 
 
 # --- Head pose --------------------------------------------------------------

@@ -1,13 +1,16 @@
 """
 SentinelVision -- demo web app.
 
-Upload an exam webcam clip; the app runs the full vision pipeline and the trained
-behaviour model, then shows what it flagged and when. Run it with:
+Upload an exam webcam clip; the app runs the full vision pipeline and shows what
+it flagged and when. Run it with:
 
     streamlit run app.py
 
-It reuses the same feature code the model trained on (src/inference/analyze.py),
-so what you see here matches the training pipeline exactly.
+It scores frames through src/inference/analyze.py, which applies the same rules
+engine the live webcam app uses -- so the demo and the product agree on what
+counts as suspicious. Everything it depends on (the fine-tuned detector, the
+calibrated thresholds) is derived from public data, so a fresh clone reproduces
+this exactly.
 """
 
 import os
@@ -16,15 +19,22 @@ import tempfile
 import pandas as pd
 import streamlit as st
 
-from src.inference.analyze import analyze_video, load_model, overall_verdict
+from src.inference.analyze import BEHAVIOURS, analyze_video, overall_verdict
+from src.thresholds import (
+    EAR_CLOSED,
+    HEAD_YAW_LOOKING_AWAY,
+    PHONE_CONF,
+    using_finetuned,
+)
 
 st.set_page_config(page_title="SentinelVision -- Exam Proctor Demo", page_icon="🎓", layout="wide")
 
 
 @st.cache_resource
-def get_model():
-    """Load the trained model once and keep it warm across reruns."""
-    return load_model()
+def warm_up():
+    """Load the detector once and keep it warm across reruns."""
+    from src.data.feature_extractor import FeatureExtractor
+    return FeatureExtractor().describe()
 
 
 def fmt_time(seconds):
@@ -84,37 +94,48 @@ def render_results(windows, summary):
 def main():
     st.title("🎓 SentinelVision — Exam Proctor Demo")
     st.write(
-        "Upload a webcam clip of someone taking an exam. The app detects gaze, head "
-        "pose, blinks and objects per frame, then a trained model predicts suspicious "
-        "behaviours over time."
+        "Upload a webcam clip of someone taking an exam. The app measures gaze, head "
+        "pose, blinks and objects on every frame with a fine-tuned YOLOv8 detector, "
+        "then flags suspicious behaviour over time using calibrated thresholds."
     )
 
     with st.sidebar:
         st.header("About")
-        try:
-            model = get_model()
-            st.success("Trained model loaded.")
-            st.write("**Behaviours it can flag:**")
-            for behaviour in model:
-                st.write(f"- {nice(behaviour)}")
-        except FileNotFoundError as error:
-            model = None
-            st.error(str(error))
+        if using_finetuned():
+            st.success("Fine-tuned detector loaded.")
+        else:
+            st.warning(
+                "Fine-tuned weights missing — falling back to stock COCO YOLOv8n, "
+                "which is far weaker on phones."
+            )
+        st.caption(warm_up())
+
+        st.write("**Behaviours it can flag:**")
+        for behaviour in BEHAVIOURS:
+            st.write(f"- {nice(behaviour)}")
 
         with st.expander("How it works & limitations"):
             st.markdown(
-                "- **Pipeline:** MediaPipe (face/gaze/head) + YOLOv8 (objects) → "
-                "2s feature windows → a random-forest classifier.\n"
-                "- **Honest caveat:** trained on a small, single-person dataset, so "
-                "numbers are illustrative, not production-grade.\n"
-                "- The *phone* signal leans on head-down posture (weak object "
-                "detection), so it can miss a phone held at eye level — a motivation "
-                "for the next phase (fine-tuning the detector)."
+                "- **Pipeline:** MediaPipe (face / gaze / head pose) + a **fine-tuned "
+                "YOLOv8n** for objects, scored per frame by the same rules engine "
+                "the live app uses, then rolled into 2s windows.
+"
+                f"- **Calibrated thresholds:** phone confidence `{PHONE_CONF}` "
+                f"(F1 0.923), head yaw `{HEAD_YAW_LOOKING_AWAY:.0f}°` (F1 0.869), "
+                f"EAR `{EAR_CLOSED}` (F1 0.979) — each swept against public "
+                "labelled data, not picked by hand.
+"
+                "- **Fine-tuning gain:** phone F1 **0.193 → 0.923** against the "
+                "stock COCO model on held-out proctoring images.
+"
+                "- **Honest caveat:** that precision was measured on the public "
+                "dataset. On unfamiliar rooms the detector still raises false "
+                "phone alarms on dark rectangular background objects — measured at "
+                "56% of phone-free frames on one held-out camera.
+"
+                "- The window score is the *fraction of frames* that fired, not a "
+                "calibrated probability."
             )
-
-    if model is None:
-        st.info("Train a model first: `python -m src.models.train`, then reload.")
-        return
 
     uploaded = st.file_uploader("Exam clip", type=["mp4", "avi", "mov", "mkv"])
     if uploaded is None:
@@ -128,7 +149,7 @@ def main():
     path = save_upload(uploaded)
     try:
         bar = st.progress(0.0, text="Analyzing frames…")
-        windows, summary = analyze_video(path, model=model, progress=lambda f: bar.progress(f))
+        windows, summary = analyze_video(path, progress=lambda f: bar.progress(f))
         bar.empty()
         render_results(windows, summary)
     except ValueError as error:

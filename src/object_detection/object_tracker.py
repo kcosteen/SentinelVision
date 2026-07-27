@@ -42,7 +42,10 @@ model = YOLO(detector_weights())
 
 # Resolve names -> ids once, for whichever model actually loaded.
 CLASS_IDS = resolve_class_ids(model, INTERESTING)
-CONF_THRESHOLD = phone_conf()
+
+# This module backs the LIVE app, so it takes the stricter operating point --
+# background clutter in an unfamiliar room reads as `cell phone` around 0.35-0.53.
+CONF_THRESHOLD = phone_conf(live=True)
 
 _WHICH = (
     "fine-tuned"
