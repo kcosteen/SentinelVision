@@ -23,6 +23,7 @@ import time
 
 from src.thresholds import (
     HEAD_YAW_LOOKING_AWAY,
+    SCORE_DECAY_PER_SEC,
     SCORE_HIGH_RISK,
     SCORE_SUSPICIOUS,
 )
@@ -30,15 +31,18 @@ from src.thresholds import (
 
 class ProctorAnalyzer:
 
-    def __init__(self):
+    def __init__(self, now=None):
         self.score = 0
 
         self.event_history = {}
 
         self.cooldown = 10
 
+        # Wall-clock of the last decay step. Injectable so tests need no sleeps.
+        self._last_decay = now if now is not None else time.time()
 
-    def add_score(self, event):
+
+    def add_score(self, event, now=None):
 
         scores = {
             "No face detected": 20,
@@ -47,7 +51,7 @@ class ProctorAnalyzer:
             "Phone detected": 50
         }
 
-        current_time = time.time()
+        current_time = now if now is not None else time.time()
 
 
         if event in self.event_history:
@@ -67,6 +71,32 @@ class ProctorAnalyzer:
 
 
         return points
+
+
+    def decay(self, now=None):
+        """Bleed the score back down while nothing is being flagged.
+
+        Without this the score only ever climbs, so a SINGLE false positive --
+        the two-second warm-up before the static filter learns the room, say --
+        pins the session at "Suspicious" for as long as it runs, long after the
+        thing that caused it is gone. A score that cannot fall is not measuring
+        current behaviour, it is measuring whether anything ever happened.
+
+        Decaying makes it a *recent* suspicion level: sustained behaviour still
+        accumulates faster than it drains (an event fires every `cooldown`
+        seconds, and every event is worth more than `SCORE_DECAY_PER_SEC` times
+        the cooldown), so a genuine phone user still climbs to High Risk and
+        stays there. Call once per frame.
+        """
+        current_time = now if now is not None else time.time()
+
+        elapsed = current_time - self._last_decay
+        self._last_decay = current_time
+
+        if elapsed > 0 and self.score > 0:
+            self.score = max(0, self.score - SCORE_DECAY_PER_SEC * elapsed)
+
+        return self.score
 
 
 

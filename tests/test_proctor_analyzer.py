@@ -156,3 +156,50 @@ def test_status_bands():
 
     analyzer.score = 70
     assert analyzer.get_status() == "High Risk"
+
+
+# ---------------------------------------------------------------------------
+# decay(): the score must reflect RECENT behaviour, not "did anything ever happen"
+# ---------------------------------------------------------------------------
+
+def test_score_decays_while_nothing_is_flagged():
+    analyzer = ProctorAnalyzer(now=0.0)
+    analyzer.add_score("Phone detected", now=0.0)
+    assert analyzer.score == 50
+
+    analyzer.decay(now=10.0)          # 10s clean at 2.0/s
+    assert analyzer.score == 30
+
+
+def test_a_single_false_positive_does_not_pin_the_session():
+    """The bug this fixes: 2s of warm-up false positives used to mean
+    'Suspicious' for the entire run, however long and however clean."""
+    analyzer = ProctorAnalyzer(now=0.0)
+    analyzer.add_score("Phone detected", now=0.0)
+    assert analyzer.get_status() == "Suspicious"
+
+    analyzer.decay(now=30.0)
+    assert analyzer.score == 0
+    assert analyzer.get_status() == "Normal"
+
+
+def test_score_never_goes_negative():
+    analyzer = ProctorAnalyzer(now=0.0)
+    analyzer.add_score("Looking away", now=0.0)
+    analyzer.decay(now=10_000.0)
+    assert analyzer.score == 0
+
+
+def test_sustained_behaviour_still_outruns_decay():
+    """Decay must not defang a real offender: events re-fire every cooldown
+    (10s, +50) which comfortably beats the 20 points decay sheds in that time."""
+    analyzer = ProctorAnalyzer(now=0.0)
+    for t in range(0, 31, 10):
+        analyzer.decay(now=float(t))
+        analyzer.add_score("Phone detected", now=float(t))
+    assert analyzer.get_status() == "High Risk"
+
+
+def test_decay_is_a_no_op_at_zero():
+    analyzer = ProctorAnalyzer(now=0.0)
+    assert analyzer.decay(now=100.0) == 0

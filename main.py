@@ -76,6 +76,9 @@ def main():
             head_yaw
         )
 
+        # Bleed the score down first, so a stale flag stops defining the run.
+        analyzer.decay()
+
         # Update suspicion score
         for event in events:
 

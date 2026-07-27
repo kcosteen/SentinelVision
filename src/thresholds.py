@@ -122,3 +122,10 @@ GAZE_RIGHT = 0.65
 # UNCALIBRATED. Suspicion-score bands in proctor_analyzer.
 SCORE_SUSPICIOUS = 30
 SCORE_HIGH_RISK = 70
+
+# UNCALIBRATED. Points bled off per second while nothing is flagged, so the score
+# reflects RECENT behaviour rather than whether anything ever happened. At 2.0 a
+# one-off "Phone detected" (+50) clears in 25s, while sustained phone use re-fires
+# every `cooldown` (10s) for +50 and easily outruns the 20 points decay sheds in
+# that time -- so real behaviour still reaches High Risk and stays.
+SCORE_DECAY_PER_SEC = 2.0
