@@ -16,6 +16,7 @@ from datetime import datetime
 
 from ultralytics import YOLO
 
+from src.detection.class_ids import resolve_class_ids
 from src.thresholds import detector_weights, phone_conf, using_finetuned
 
 LOG_FILE = os.path.join("logs", "detections.csv")
@@ -40,10 +41,7 @@ _ensure_log()
 model = YOLO(detector_weights())
 
 # Resolve names -> ids once, for whichever model actually loaded.
-_NAME_TO_ID = {
-    str(name).strip().lower(): index for index, name in (model.names or {}).items()
-}
-CLASS_IDS = [_NAME_TO_ID[name] for name in INTERESTING if name in _NAME_TO_ID]
+CLASS_IDS = resolve_class_ids(model, INTERESTING)
 CONF_THRESHOLD = phone_conf()
 
 _WHICH = (

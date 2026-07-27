@@ -28,7 +28,11 @@ RIGHT_EYE = [
     380   # bottom-left
 ]
 
-EAR_THRESHOLD = 0.20
+from src.thresholds import EAR_CLOSED
+
+# Single source of truth -- this used to be its own literal 0.20, which is how
+# it and feature_extractor.py could have drifted apart unnoticed.
+EAR_THRESHOLD = EAR_CLOSED
 
 blink_counter = 0
 blink_total = 0

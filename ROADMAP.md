@@ -48,11 +48,19 @@ in only **20.7%** of frames from our own `phone_*` clips, which is why the Phase
 - [x] AP@0.5 / IoU implemented from scratch + unit tested, so the baseline
       comparison is apples-to-apples across differing class ids
 - [x] Baseline measured: **AP@0.5 0.432, precision 0.761, recall 0.406**
-- [ ] Annotate the 201 extracted frames — see [`docs/ANNOTATION_GUIDE.md`](docs/ANNOTATION_GUIDE.md)
-- [ ] Fine-tune and report the delta, on our own footage specifically
+- [x] **Fine-tuned and reported the delta:** F1 **0.193 → 0.923** on held-out
+      proctoring images, both models scored by the same from-scratch code
+- [x] Threshold calibrated from the sweep rather than guessed (conf **0.35**),
+      and the calibrated head-yaw rule (**30°**, F1 0.869) wired into the live
+      looking-away decision — replacing the hand-picked gaze cut-points
+- [x] Measured the fine-tune on our OWN footage and reported the bad news:
+      **56.4%** false-positive rate on 741 phone-free frames, all of them one
+      piece of background furniture. Public precision did not transfer.
+- [ ] _Deferred:_ annotate own frames as hard negatives to close that gap —
+      see [`docs/ANNOTATION_GUIDE.md`](docs/ANNOTATION_GUIDE.md)
 
-**Skills shown:** annotation, augmentation, transfer learning, mAP evaluation,
-active-learning-style sample selection, licence diligence.
+**Skills shown:** transfer learning, mAP/F1 evaluation, threshold calibration,
+leak-free splitting, and diagnosing domain shift in your own model.
 
 ### 🔜 Phase 3 — Ship it
 

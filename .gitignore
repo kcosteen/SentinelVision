@@ -24,6 +24,10 @@ __pycache__/
 # external — src/detection/ rebuilds any of it from scratch.
 /data/detection/
 
+# Downloaded calibration datasets (125 MB of parquet; re-fetched on demand by
+# src/calibration/calibrate_ear.py).
+/data/calibration/
+
 # Raw recorded video clips (your own footage — private / large). Keep the folder + README.
 /clips/*
 !/clips/README.md

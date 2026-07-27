@@ -24,8 +24,8 @@ SentinelVision analyzes a live camera stream frame-by-frame to detect the behavi
 | Feature | What it does | Tech |
 |---|---|---|
 | **Face presence & count** | Flags `No face detected` (candidate left) and `Multiple people detected` (someone else in frame) | MediaPipe Face Detection |
-| **Gaze tracking** | Uses iris landmarks to estimate Left / Right / Center gaze; sustained off-center looking is flagged as `Looking away` | MediaPipe Face Mesh (refined iris landmarks) |
-| **Object / phone detection** | Detects phones, books, and other objects of interest in real time | YOLOv8 (Ultralytics) |
+| **Looking-away detection** | Head-pose yaw past a **calibrated 30°** flags `Looking away`; iris gaze is the fallback when no pose is solved | MediaPipe Face Mesh + `cv2.solvePnP` |
+| **Object / phone detection** | Detects phones, books, laptops and headphones in real time | **Fine-tuned YOLOv8n** (F1 0.923 vs 0.193 stock) |
 | **Behavior scoring engine** | Converts raw detections into a weighted suspicion score, with a per-event cooldown so one event isn't double-counted | Custom rules engine |
 | **Audit logging** | Timestamps every event and object detection to `logs/*.csv` | Python `csv` |
 | **Live HUD** | Draws the current score, risk status, and active alerts onto the video feed | OpenCV |
@@ -73,11 +73,79 @@ The cumulative score maps to a risk status:
 
 ---
 
+## 📈 Measured Results
+
+Nothing below is an estimate — each number comes from a script in this repo, run
+against held-out data.
+
+### Fine-tuning the phone detector
+
+The stock COCO YOLOv8n is poor at exam-webcam phone detection, so it was
+fine-tuned on a 25,173-frame online-proctoring dataset (CC BY 4.0). Both models
+were scored by the **same** from-scratch AP/F1 code on the same held-out images,
+because the two number their classes differently and each model's self-reported
+metric isn't comparable:
+
+| Model | Precision | Recall | **F1** |
+|---|---:|---:|---:|
+| Pre-trained YOLOv8n (COCO) | 0.215 | 0.176 | **0.193** |
+| **Fine-tuned** (this project) | 0.909 | 0.936 | **0.923** |
+
+The val split is regrouped **by source video** (`split_by_source.py`) — the
+export's own split put ~87% of frames from one video and drew 100% of val from
+it, so validating on it would have scored the model on the same person in the
+same room it trained on.
+
+### Thresholds: measured, not guessed
+
+Every decision boundary lives in [`src/thresholds.py`](src/thresholds.py), each
+tagged CALIBRATED (with the command that produced it) or UNCALIBRATED (someone
+picked it). Two were measured:
+
+| Threshold | Value | How it was measured | Result |
+|---|---:|---|---|
+| Phone confidence | `0.35` | Swept 0.05–0.95 over 700 held-out proctoring images | F1 **0.923**; flat 0.25–0.50, so a plateau not a knife-edge |
+| Head yaw "looking away" | `30°` | Swept against 463 Gourier head-pose images whose filenames encode the true pan angle | F1 **0.869** (P 0.835 / R 0.905) |
+| Eye Aspect Ratio "closed" | `0.23` | Swept over 1,999 labelled open/closed eye images (ODC-BY) | F1 **0.979**; the classes barely overlap (Cohen's d **4.11**) |
+
+Because the yaw threshold is the measured one, it is what the analyzer actually
+decides on; the hand-picked iris-gaze cut-points are only a fallback for frames
+where no head pose could be solved.
+
+The EAR sweep is a good example of why the shape of the curve matters more than
+its argmax. F1 peaks at 0.25, but precision falls off a cliff just above it (131
+false positives by 0.30), while the open and closed distributions leave a wide
+empty gap from ~0.16 to ~0.29. `0.23` gives up 0.003 F1 to sit nearer the middle
+of that gap, so a modest shift from a different camera doesn't cross it — the
+same domain-shift trap documented below, avoided this time.
+
+The one threshold still **uncalibrated** is the iris-gaze pair (0.35/0.65): no
+public gaze dataset with usable ground truth turned up, and `src/thresholds.py`
+says so rather than implying it was measured.
+
+### Honest limitations
+
+Measuring your own model's failures is the point of the exercise, so:
+
+- **The detector's precision does not transfer to my camera.** On 741 phone-free
+  frames of my own webcam clips it still fires `cell phone` on **56.4%** of them.
+  Every false positive is the same wall shelf behind me. Public-set precision of
+  0.909 is a statement about the public set, not about my room — a textbook
+  domain shift. Fixing it needs hard negatives from my own environment.
+- **Phones at the frame edge are missed.** Held low and half out of shot, the
+  detector scores them 0.09–0.16, below any usable threshold.
+- **The head-yaw rule is conservative by construction.** Zero false positives in
+  624 frames of normal footage, but it was calibrated against "true pan ≥ 45°",
+  so subtle turns (14–24°) fall under the cut, and looking *down* is invisible
+  to a yaw-only rule.
+
+---
+
 ## 🛠️ Tech Stack
 
 - **Language:** Python
 - **Computer Vision:** OpenCV, MediaPipe (Face Detection, Face Mesh + iris)
-- **Object Detection:** Ultralytics YOLOv8 (`yolov8n`)
+- **Object Detection:** Ultralytics YOLOv8 — `yolov8n` fine-tuned on a proctoring dataset
 - **Math / Geometry:** NumPy, `cv2.solvePnP` (head-pose estimation), Eye Aspect Ratio (EAR)
 - **Logging:** CSV audit trail
 
@@ -91,7 +159,7 @@ SentinelVision/
 ├── ROADMAP.md                       # Project plan & milestones
 ├── requirements.txt
 ├── requirements-dev.txt             # Test dependencies (pytest)
-├── yolov8n.pt                       # Pre-trained YOLOv8 weights (included)
+├── yolov8n.pt                       # Stock YOLOv8 weights (baseline / fallback)
 ├── docs/
 │   ├── DESIGN_NOTES.md              # Architecture, tradeoffs, and glossary
 │   ├── DATASETS.md                  # Phase 2 dataset survey, licences, baseline
@@ -106,7 +174,7 @@ SentinelVision/
     │   ├── face_detection.py         # Face presence & count
     │   ├── gaze_detection.py         # Gaze direction from face mesh
     │   ├── blink_detection.py        # Blink detection (EAR)        ── built, integration pending
-    │   └── head_pose_detection.py    # Head orientation (solvePnP)  ── built, integration pending
+    │   └── head_pose_detection.py    # Head orientation (solvePnP)
     ├── features/
     │   ├── gaze_estimation.py        # Iris-center → gaze ratio
     │   ├── eye_analysis.py           # Eye Aspect Ratio math
@@ -195,7 +263,9 @@ build a labeled test set). Design decisions and tradeoffs are documented in
 - [x] Behavior scoring engine with risk status + event logging
 - [x] Unit tests + evaluation harness (precision / recall / F1)
 - [ ] Replace the rules engine with a trained temporal behavior model
-- [ ] Integrate blink-rate & head-pose signals into the live score _(modules already built)_
+- [x] Fine-tune the phone detector on a real proctoring dataset & report the delta
+- [x] Integrate the calibrated head-pose signal into the live score
+- [ ] Integrate blink-rate into the live score _(module built; EAR threshold still uncalibrated)_
 - [ ] End-of-session summary report
 - [ ] Save alert snapshots alongside the CSV log
 - [ ] Configurable thresholds & multi-face identity tracking

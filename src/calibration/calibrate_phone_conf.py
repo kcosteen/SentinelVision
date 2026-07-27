@@ -33,8 +33,9 @@ import os
 import cv2
 
 from src.calibration.sweep import best_threshold, candidate_thresholds, summarise_choice
+from src.detection.class_ids import phone_class_index
 from src.detection.detection_metrics import match_image
-from src.detection.train_detector import COCO_CELL_PHONE, read_yolo_labels
+from src.detection.train_detector import read_yolo_labels
 
 # The value feature_extractor.py currently uses -- what we're checking.
 CURRENT_PHONE_CONF = 0.5
@@ -65,12 +66,7 @@ def resolve_layout(args, split):
     if isinstance(names, dict):
         names = [names[k] for k in sorted(names)]
 
-    wanted = {"cell phone", "phone", "mobile_phone", "mobile phone"}
-    phone_class = next(
-        (i for i, n in enumerate(names) if str(n).strip().lower() in wanted), None
-    )
-    if phone_class is None:
-        raise SystemExit(f"No phone-like class in {names}")
+    phone_class = phone_class_index(names)
 
     print(f"  classes in export: {names}  ->  using index {phone_class}")
     return (os.path.join(args.export_root, split, "images"),

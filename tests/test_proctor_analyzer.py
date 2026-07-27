@@ -30,6 +30,7 @@ def test_multiple_faces_raises_event():
 
 
 def test_looking_away_raises_event():
+    """With no head pose available, the gaze fallback still decides."""
     analyzer = ProctorAnalyzer()
     events = analyzer.analyze(object_results=[], face_count=1, gaze="LEFT")
     assert events == ["Looking away"]
@@ -39,6 +40,54 @@ def test_center_gaze_is_not_flagged():
     analyzer = ProctorAnalyzer()
     events = analyzer.analyze(object_results=[], face_count=1, gaze="CENTER")
     assert events == []
+
+
+# --- the calibrated head-yaw rule (|yaw| >= 30 deg, f1 0.869) ---------------
+
+def test_head_yaw_past_threshold_is_looking_away():
+    analyzer = ProctorAnalyzer()
+    events = analyzer.analyze(
+        object_results=[], face_count=1, gaze="CENTER", head_yaw=45.0
+    )
+    assert events == ["Looking away"]
+
+
+def test_head_yaw_sign_is_ignored():
+    """Signed yaw is unreliable (RQDecomp3x3 flip), so only |yaw| may be used."""
+    analyzer = ProctorAnalyzer()
+    for yaw in (40.0, -40.0):
+        events = ProctorAnalyzer().analyze(
+            object_results=[], face_count=1, gaze="CENTER", head_yaw=yaw
+        )
+        assert events == ["Looking away"], f"yaw={yaw}"
+
+
+def test_head_yaw_below_threshold_is_not_flagged():
+    analyzer = ProctorAnalyzer()
+    events = analyzer.analyze(
+        object_results=[], face_count=1, gaze="CENTER", head_yaw=12.0
+    )
+    assert events == []
+
+
+def test_head_yaw_outranks_the_uncalibrated_gaze():
+    """The measured signal decides; the guessed one must not override it.
+
+    Facing forward (yaw 5 deg) with a gaze ratio that reads LEFT is exactly the
+    case the hand-picked 0.35/0.65 cut-points get wrong, so it must not flag.
+    """
+    analyzer = ProctorAnalyzer()
+    events = analyzer.analyze(
+        object_results=[], face_count=1, gaze="LEFT", head_yaw=5.0
+    )
+    assert events == []
+
+
+def test_gaze_is_used_only_when_head_pose_is_missing():
+    analyzer = ProctorAnalyzer()
+    assert analyzer.analyze(
+        object_results=[], face_count=1, gaze="RIGHT", head_yaw=None
+    ) == ["Looking away"]
 
 
 def test_phone_object_raises_event():

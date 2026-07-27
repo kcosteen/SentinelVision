@@ -43,14 +43,9 @@ def detect_gaze(frame):
             h
         )
 
-        cv2.putText(
-            frame,
-            f"Gaze: {gaze}",
-            (20, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
-            2
-        )
-
+    # No drawing here on purpose. This is handed the PRISTINE `source` frame in
+    # main.py, and anything painted on it would be measured by the models
+    # downstream. (The old putText here drew onto the local flipped copy, which
+    # was then discarded -- so the overlay never reached the screen anyway.)
+    # main.py draws the label on the display frame instead.
     return gaze_results, gaze
