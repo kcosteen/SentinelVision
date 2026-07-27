@@ -6,76 +6,98 @@ role screens for. Each phase adds a concrete, resume-worthy capability.
 
 ---
 
-### ✅ Phase 0 — Make it credible (done)
+### ✅ Phase 0 — Make it credible
 
 Foundations that let every later phase be measured instead of guessed.
 
-- [x] Unit tests for the pure logic (`geometry`, EAR, gaze ratio, scoring engine)
-- [x] Evaluation harness with real metrics — precision / recall / F1 per behavior
+- [x] Unit tests for the pure logic (geometry, EAR, gaze ratio, scoring engine)
+- [x] Evaluation harness with real metrics — precision / recall / F1 per behaviour
 - [x] Project packaging (`pyproject.toml`) + dev dependencies
 
 **Skills shown:** evaluation, metrics, testing, reproducibility.
 
-### 🔜 Phase 1 — Learn the behavior model (flagship)
+---
 
-Replace the hand-coded rules in `proctor_analyzer.py` with a *trained* model.
+### ⚰️ Phase 1 — Learn the behaviour model *(attempted, then retired)*
 
-- [x] Log per-frame features to CSV (`src/data/`) — gaze, head pose, blink,
-      face count, objects
-- [ ] Record + label sessions as normal / suspicious segments -> a real dataset
-- [ ] Aggregate frames into sliding time windows (blink rate, gaze variance, ...)
-- [ ] Train a classifier: start simple (logistic regression / gradient boosting),
-      then a temporal model (LSTM / GRU / 1D-CNN)
-- [ ] Evaluate with train/val/test split, ROC-AUC, precision-recall, calibration
+The original plan was to replace the hand-coded rules in `proctor_analyzer.py`
+with a temporal classifier trained on recorded clips. It was built end-to-end —
+feature logging, sliding windows, clip-grouped splits, a RandomForest with
+GroupKFold — and then **removed**, deliberately.
 
-**Skills shown:** feature engineering, dataset creation, sequence modeling,
-the full train -> evaluate loop.
+**Why it was retired, which is the useful part:**
 
-### 🔜 Phase 2 — Train a detector
+- Its `phone` class ranked the real phone features (`phone_frac`, `phone_conf_*`)
+  **dead last** in importance and predicted from `head_pitch` instead. It had
+  learned head-down *posture* as a proxy, because the detector of the day found a
+  phone in only ~20% of frames — there was almost no real signal to learn from.
+- The fix was therefore not a better classifier but a better detector → Phase 2.
+- The training set was one person in one room. Any metric from it described that
+  person, not the problem.
 
-Motivated by a measured failure, not a hunch: pre-trained YOLOv8n finds the phone
-in only **20.7%** of frames from our own `phone_*` clips, which is why the Phase 1
-`phone` model learned head-down *posture* as a proxy instead.
+**Skills shown:** feature engineering, grouped cross-validation, and — more
+importantly — reading feature importances instead of trusting an F1 score, then
+deleting work that doesn't hold up. Code removed; a repo shouldn't ship a
+pipeline that can't run.
 
-- [x] Survey public datasets, with licences and caveats — [`docs/DATASETS.md`](docs/DATASETS.md),
+---
+
+### ✅ Phase 2 — Train a detector
+
+Motivated by a measured failure, not a hunch.
+
+- [x] Survey public datasets with licences and caveats — [`docs/DATASETS.md`](docs/DATASETS.md),
       registry in `src/detection/sources.py`
 - [x] Roboflow Universe importer keyed off `ROBOFLOW_API_KEY`, remapping their
       class lists onto ours and dropping out-of-scope classes
-- [x] Dataset pipeline: COCO→YOLO conversion, merge public + our own frames,
-      clip-grouped split (`src/detection/prepare_dataset.py`)
+- [x] Dataset pipeline: COCO→YOLO conversion, class remapping, grouped splits
 - [x] Leak-free splitting by source video (`src/detection/split_by_source.py`) —
       the export's own split drew 100% of val from one video that was 87% of the data
-- [x] AP@0.5 / IoU implemented from scratch + unit tested, so the baseline
-      comparison is apples-to-apples across differing class ids
-- [x] Baseline measured: **AP@0.5 0.432, precision 0.761, recall 0.406**
+- [x] AP@0.5 / IoU implemented from scratch + unit tested, so both models are
+      scored apples-to-apples across differing class conventions
 - [x] **Fine-tuned and reported the delta:** F1 **0.193 → 0.923** on held-out
-      proctoring images, both models scored by the same from-scratch code
-- [x] Threshold calibrated from the sweep rather than guessed (conf **0.35**),
-      and the calibrated head-yaw rule (**30°**, F1 0.869) wired into the live
-      looking-away decision — replacing the hand-picked gaze cut-points
-- [x] Measured the fine-tune on our OWN footage and reported the bad news:
-      **56.4%** false-positive rate on 741 phone-free frames, all of them one
-      piece of background furniture. Public precision did not transfer.
-- [x] Fixed it structurally instead: an occupancy-grid static-region filter
+      proctoring images
+- [x] Thresholds calibrated rather than guessed: phone conf **0.35** (F1 0.923),
+      head yaw **30°** (F1 0.869), EAR **0.23** (F1 0.979) — with the two that
+      remain guesses labelled as such in `src/thresholds.py`
+- [x] Measured the fine-tune on an unseen camera and reported the bad news:
+      **56.4%** false positives on 741 phone-free frames, all one piece of
+      furniture. Public precision did not transfer.
+- [x] Fixed it structurally: an occupancy-grid static-region filter
       (`src/object_detection/static_filter.py`), after three designs were
-      rejected on measurements — see the README for that debugging arc
+      rejected on measurements — see the README for that arc
+- [x] Published to the Hub with a model card that leads with the limitations —
+      [kcosteen/sentinelvision-proctoring-yolov8n](https://huggingface.co/kcosteen/sentinelvision-proctoring-yolov8n)
 - [ ] _Deferred:_ hard negatives from the deployment environment, which remains
       the honest fix rather than a filter
 
 **Skills shown:** transfer learning, mAP/F1 evaluation, threshold calibration,
-leak-free splitting, and diagnosing domain shift in your own model.
+leak-free splitting, licence diligence, and diagnosing domain shift in your own
+model.
+
+---
 
 ### 🔜 Phase 3 — Ship it
 
-- [ ] FastAPI inference service, containerized with Docker
-- [ ] Streamlit / Gradio demo (upload a clip -> get a report) — a live link
-- [ ] Experiment tracking with Weights & Biases or MLflow; model + dataset cards
+- [x] Model card + dataset documentation, published alongside the weights
+- [x] Weights fetched from the Hub at runtime, so a fresh clone gets the real
+      detector instead of silently falling back to COCO
+- [x] Streamlit demo (upload a clip → get a report), runnable locally
+- [ ] Host the demo for a clickable link — Streamlit Community Cloud
+      (Hugging Face Spaces needs billing on file; the container is ready in
+      `deploy/space/` if that changes)
+- [ ] FastAPI inference service, containerized
+- [ ] Experiment tracking (Weights & Biases / MLflow) for the fine-tuning runs
 
 **Skills shown:** serving, containerization, experiment tracking, MLOps.
 
+---
+
 ### 🔭 Phase 4 — Differentiate
 
-- [ ] Real-time optimization (ONNX / quantization) with FPS-vs-accuracy analysis
+- [ ] Real-time optimization (ONNX / quantization) with an FPS-vs-accuracy analysis
+- [ ] Temporal modelling over the signal stream — the honest version of Phase 1,
+      once there is footage of more than one person to train it on
 - [ ] LLM-generated natural-language incident summaries from the event log
 
 ---
