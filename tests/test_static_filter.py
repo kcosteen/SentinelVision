@@ -15,7 +15,13 @@ the occupancy-grid replacement cannot regress into them:
 * the frame rate may be anything (thresholds are wall-clock seconds)
 """
 
-from src.object_detection.static_filter import StaticRegionFilter, centre, iou
+from src.object_detection.static_filter import (
+    StaticRegionFilter,
+    centre,
+    centre_inside,
+    held_by_person,
+    iou,
+)
 
 FRAME = (1280, 720)
 
@@ -219,3 +225,62 @@ def test_book_is_not_suppressed_by_default():
 def test_empty_frame_is_handled():
     f = StaticRegionFilter()
     assert f.step([], FRAME, now=0.0) == []
+
+
+# --- the person exemption --------------------------------------------------
+#
+# "A phone in use moves" is FALSE for the case that matters most: a phone being
+# READ is held still. Static suppression alone would learn it as furniture.
+
+PERSON = (350.0, 60.0, 900.0, 720.0)      # candidate, centre-left of frame
+
+
+def test_centre_inside_basic():
+    assert centre_inside((400.0, 300.0, 500.0, 400.0), PERSON) is True
+    assert centre_inside(SHELF, PERSON) is False
+
+
+def test_centre_inside_margin_extends_the_box():
+    just_outside = (920.0, 300.0, 960.0, 340.0)
+    assert centre_inside(just_outside, PERSON, margin=0.0) is False
+    assert centre_inside(just_outside, PERSON, margin=0.25) is True
+
+
+def test_default_margin_is_strict_enough_to_exclude_adjacent_clutter():
+    """Why margin defaults to 0. The person box runs head-to-floor, so a 25%
+    margin grows it by 130+ px and reaches the shelf sitting right beside them --
+    which would re-admit the exact false positive the filter exists to remove."""
+    assert held_by_person(SHELF, [PERSON]) is False           # default, strict
+    assert held_by_person(SHELF, [PERSON], margin=0.25) is True   # the trap
+
+
+def test_phone_on_the_person_is_held():
+    assert held_by_person((500.0, 300.0, 620.0, 560.0), [PERSON]) is True
+
+
+def test_shelf_is_not_held_by_the_person():
+    assert held_by_person(SHELF, [PERSON]) is False
+
+
+def test_held_by_person_with_nobody_detected():
+    assert held_by_person(SHELF, []) is False
+
+
+def test_a_phone_read_completely_still_is_still_reported():
+    """THE regression test for this bug. A phone held rock-steady in front of the
+    candidate for 10 seconds -- someone reading it -- must never be suppressed,
+    even though the filter has every reason to call that region static."""
+    f = StaticRegionFilter(static_seconds=2.0)
+    reading = (500.0, 300.0, 620.0, 560.0)
+
+    suppressed_at_some_point = False
+    for i in range(100):
+        keep = f.step([("cell phone", reading)], FRAME, now=i * 0.1)[0]
+        if not keep and not held_by_person(reading, [PERSON]):
+            suppressed_at_some_point = True
+
+    # The grid alone WOULD have learned it -- that is the trap.
+    assert f.step([("cell phone", reading)], FRAME, now=10.1)[0] is False
+    # ...but the person exemption rescues it.
+    assert held_by_person(reading, [PERSON]) is True
+    assert suppressed_at_some_point is False

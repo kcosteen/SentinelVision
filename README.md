@@ -54,14 +54,25 @@ flowchart LR
 
 The analyzer assigns points to each flagged event and keeps a cumulative score:
 
-| Event | Points |
-|---|---:|
-| Looking away | +10 |
-| No face detected | +20 |
-| Multiple people detected | +40 |
-| Phone detected | +50 |
+| Event | Points | Signal behind it |
+|---|---:|---|
+| Gaze off screen | +5 | iris ratio — **uncalibrated**, hence the lowest weight |
+| Looking away | +10 | head yaw ≥ 30° — calibrated, F1 0.869 |
+| No face detected | +20 | MediaPipe face count |
+| Multiple people detected | +40 | MediaPipe face count |
+| Phone detected | +50 | fine-tuned YOLOv8n, F1 0.923 |
 
-A **10-second cooldown** per event type prevents the same continuous behavior from inflating the score every frame.
+Weights track how much each signal is **trusted**, not only how bad the behaviour
+is. `Gaze off screen` scores least because it is the one rule still resting on
+hand-picked cut-points; it earns its place because head yaw only sees a turned
+*head*, so glancing at notes beside the screen is invisible without it. A turned
+head raises one event, not both.
+
+A **10-second cooldown** per event type prevents the same continuous behavior from
+inflating the score every frame, and the score **decays by 2 points/second** while
+nothing is flagged — so it reads as a *current* suspicion level rather than a
+record of whether anything ever happened. Sustained behaviour still outruns the
+decay comfortably (+50 every 10s against 20 shed).
 
 The cumulative score maps to a risk status:
 

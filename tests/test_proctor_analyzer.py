@@ -29,11 +29,12 @@ def test_multiple_faces_raises_event():
     assert events == ["Multiple people detected"]
 
 
-def test_looking_away_raises_event():
-    """With no head pose available, the gaze fallback still decides."""
+def test_gaze_alone_raises_the_weaker_event():
+    """With no head pose, gaze is all we have -- but falling back to a guess
+    does not promote it to a measurement, so it stays the cheaper event."""
     analyzer = ProctorAnalyzer()
     events = analyzer.analyze(object_results=[], face_count=1, gaze="LEFT")
-    assert events == ["Looking away"]
+    assert events == ["Gaze off screen"]
 
 
 def test_center_gaze_is_not_flagged():
@@ -70,24 +71,39 @@ def test_head_yaw_below_threshold_is_not_flagged():
     assert events == []
 
 
-def test_head_yaw_outranks_the_uncalibrated_gaze():
-    """The measured signal decides; the guessed one must not override it.
-
-    Facing forward (yaw 5 deg) with a gaze ratio that reads LEFT is exactly the
-    case the hand-picked 0.35/0.65 cut-points get wrong, so it must not flag.
-    """
+def test_eyes_off_screen_with_head_forward_is_the_weaker_event():
+    """Head forward, eyes elsewhere -- glancing at notes beside the screen.
+    Yaw cannot see this at all, which is why gaze earns its place; but it scores
+    5 rather than 10 because its cut-points were never checked against truth."""
     analyzer = ProctorAnalyzer()
     events = analyzer.analyze(
         object_results=[], face_count=1, gaze="LEFT", head_yaw=5.0
     )
-    assert events == []
+    assert events == ["Gaze off screen"]
+    assert analyzer.add_score("Gaze off screen") == 5
 
 
-def test_gaze_is_used_only_when_head_pose_is_missing():
+def test_a_turned_head_is_not_double_counted():
+    """Turning your head usually moves your gaze too. Both firing would score
+    the same behaviour twice."""
+    analyzer = ProctorAnalyzer()
+    events = analyzer.analyze(
+        object_results=[], face_count=1, gaze="LEFT", head_yaw=45.0
+    )
+    assert events == ["Looking away"]
+
+
+def test_the_measured_signal_still_outweighs_the_guessed_one():
+    analyzer = ProctorAnalyzer()
+    assert analyzer.add_score("Looking away") == 10
+    assert analyzer.add_score("Gaze off screen") == 5
+
+
+def test_centre_gaze_with_head_forward_is_clean():
     analyzer = ProctorAnalyzer()
     assert analyzer.analyze(
-        object_results=[], face_count=1, gaze="RIGHT", head_yaw=None
-    ) == ["Looking away"]
+        object_results=[], face_count=1, gaze="CENTER", head_yaw=5.0
+    ) == []
 
 
 def test_phone_object_raises_event():

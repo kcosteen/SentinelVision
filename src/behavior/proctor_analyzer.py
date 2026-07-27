@@ -44,10 +44,14 @@ class ProctorAnalyzer:
 
     def add_score(self, event, now=None):
 
+        # Weights track how much each signal is TRUSTED, not just how bad the
+        # behaviour is. "Gaze off screen" is the cheapest because it rests on the
+        # one threshold still uncalibrated -- see the note in analyze().
         scores = {
             "No face detected": 20,
             "Multiple people detected": 40,
             "Looking away": 10,
+            "Gaze off screen": 5,
             "Phone detected": 50
         }
 
@@ -125,14 +129,32 @@ class ProctorAnalyzer:
             events.append("Multiple people detected")
 
 
-        # Looking away: use the measured signal when we have it, the guessed
-        # one only when we don't. abs() because the yaw SIGN is unreliable.
+        # Looking away is TWO events, because it rests on two signals of very
+        # different quality and collapsing them would launder a guess into
+        # looking like a measurement:
+        #
+        #   "Looking away"     head turned past the CALIBRATED 30 deg (f1 0.869)
+        #   "Gaze off screen"  head forward, but the eyes are off-centre -- from
+        #                      the UNCALIBRATED 0.35/0.65 iris ratios
+        #
+        # Gaze earns its place: head yaw only catches a turned HEAD, so glancing
+        # at notes beside the screen is invisible to it. It scores less because
+        # nobody has checked those cut-points against ground truth.
+        #
+        # abs() because the yaw SIGN is unreliable (RQDecomp3x3 flip).
+        off_centre_gaze = gaze is not None and gaze != "CENTER"
+
         if head_yaw is not None:
             if abs(head_yaw) >= HEAD_YAW_LOOKING_AWAY:
                 events.append("Looking away")
+            elif off_centre_gaze:
+                # Head forward, eyes elsewhere -- exactly what yaw cannot see.
+                events.append("Gaze off screen")
 
-        elif gaze is not None and gaze != "CENTER":
-            events.append("Looking away")
+        elif off_centre_gaze:
+            # No head pose this frame, so gaze is all we have. Still the weaker
+            # event: falling back to a guess does not make it a measurement.
+            events.append("Gaze off screen")
 
 
         # Object checks

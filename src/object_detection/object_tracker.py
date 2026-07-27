@@ -17,7 +17,7 @@ from datetime import datetime
 from ultralytics import YOLO
 
 from src.detection.class_ids import resolve_class_ids
-from src.object_detection.static_filter import StaticRegionFilter
+from src.object_detection.static_filter import StaticRegionFilter, held_by_person
 from src.thresholds import detector_weights, phone_conf, using_finetuned
 
 LOG_FILE = os.path.join("logs", "detections.csv")
@@ -86,9 +86,15 @@ def detect_objects(frame):
         [(c["label"], c["box"]) for c in candidates], (width, height)
     )
 
+    # Anything on or beside the candidate is never treated as scenery, however
+    # still it is held. A phone being READ barely moves, and that is the single
+    # most important thing this app has to catch -- static suppression alone
+    # would quietly learn it as furniture after a couple of seconds.
+    people = [c["box"] for c in candidates if c["label"] == "person"]
+
     detected = []
     for candidate, wanted in zip(candidates, keep):
-        if not wanted:
+        if not wanted and not held_by_person(candidate["box"], people):
             continue                       # background furniture, not behaviour
         detected.append(candidate)
 

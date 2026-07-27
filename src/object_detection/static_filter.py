@@ -100,6 +100,44 @@ def centre(box):
     return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
 
+def centre_inside(box, container, margin=0.0):
+    """Is `box`'s centre inside `container`, optionally grown by a margin?
+
+    `margin` is a fraction of the container's own size, so a person detected
+    close to the camera gets a proportionally larger allowance than one sitting
+    far back.
+    """
+    cx, cy = centre(box)
+    x1, y1, x2, y2 = container
+    pad_x = abs(x2 - x1) * margin
+    pad_y = abs(y2 - y1) * margin
+    return (x1 - pad_x) <= cx <= (x2 + pad_x) and (y1 - pad_y) <= cy <= (y2 + pad_y)
+
+
+def held_by_person(box, person_boxes, margin=0.0):
+    """True when this object sits on or beside a detected person.
+
+    The escape hatch for static suppression. The premise "a phone in use moves"
+    turns out to be FALSE for the case that matters most: a phone being *read* is
+    held still, and reading a phone is exactly the behaviour worth catching. Held
+    steady for `static_seconds` it would be learned as furniture and ignored.
+
+    What still separates them is position. A phone in use is in someone's hands,
+    so its centre falls on the person; a shelf on the wall does not. Anything
+    overlapping the candidate is therefore never suppressed, however still it is
+    held.
+
+    `margin` defaults to 0 -- strict containment -- and that is deliberate. A
+    person box runs from head to the bottom of the frame, so even a 25% margin
+    grows it by well over a hundred pixels and swallows clutter sitting just
+    beside the candidate. Any margin generous enough to catch a phone held out at
+    arm's length is also generous enough to re-admit the shelf, which would undo
+    the entire filter. A phone held far enough from the body to fall outside is
+    also, conveniently, not being read.
+    """
+    return any(centre_inside(box, person, margin) for person in person_boxes)
+
+
 def iou(a, b):
     """Intersection over union of two boxes. Diagnostics only -- see above for
     why this is emphatically NOT what suppression is based on."""
