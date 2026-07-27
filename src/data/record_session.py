@@ -53,6 +53,9 @@ def record_features(source, out_path, session_id, label_columns, show=False):
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     extractor = FeatureExtractor()
+    # Rows from different detectors are not comparable, so say which one made
+    # these before a single frame is written.
+    print(f"[features] {extractor.describe()}")
 
     rows_written = 0
     start = time.time()

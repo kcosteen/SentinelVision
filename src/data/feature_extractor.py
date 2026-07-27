@@ -16,20 +16,34 @@ import cv2
 import mediapipe as mp
 from ultralytics import YOLO
 
+from src.detection.class_ids import resolve_class_ids
 from src.features.gaze_estimation import estimate_gaze, gaze_ratio
 from src.features.eye_analysis import calculate_ear
 from src.features.head_pose import calculate_head_pose
+from src.thresholds import (
+    BASELINE_WEIGHTS,
+    BLINK_MIN_FRAMES,
+    EAR_CLOSED,
+    FINETUNED_WEIGHTS,
+    detector_weights,
+    phone_conf,
+)
 
 
 # Eye-landmark indices for EAR -- must match src/vision/blink_detection.py.
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 
-EAR_THRESHOLD = 0.20      # below this the eye is treated as closed
-BLINK_MIN_FRAMES = 2      # eyes closed for >= this many frames counts as one blink
+# Both now come from src/thresholds.py, which records whether each was measured
+# or guessed. EAR_CLOSED is still a guess; the phone confidence below is not.
+EAR_THRESHOLD = EAR_CLOSED
 
-# COCO class ids we care about for proctoring.
-YOLO_CLASSES = {"person": 0, "laptop": 63, "cell phone": 67, "book": 73}
+# Objects worth logging, BY NAME -- never by id. See src/detection/class_ids.py:
+# 'cell phone' is 67 in COCO and 1 in the proctoring fine-tune, so the previous
+# hard-coded {"person": 0, "laptop": 63, "cell phone": 67, "book": 73} silently
+# resolved to nothing but 'book' against the fine-tune, logging person_count 0
+# and phone_conf 0.0 on every frame.
+OBJECT_NAMES = ["person", "laptop", "cell phone", "book"]
 
 # The measurement columns this extractor produces (order defines the CSV order).
 MEASUREMENT_FIELDS = [
@@ -61,8 +75,23 @@ class FeatureExtractor:
     several frames), so create ONE extractor per recording session.
     """
 
-    def __init__(self, yolo_weights="yolov8n.pt", object_conf=0.5):
-        self.object_conf = object_conf
+    def __init__(self, yolo_weights=None, object_conf=None):
+        # Default to the best available detector and ITS calibrated threshold,
+        # rather than the old hard-coded ('yolov8n.pt', 0.5). That pairing was
+        # measured at recall 0.064 on real proctoring frames -- it logged a
+        # phone in ~6% of the frames that had one, which is why the Phase 1
+        # phone model learned head-down posture as a proxy instead.
+        self._weights = yolo_weights or detector_weights()
+        self._yolo = YOLO(self._weights)
+        self.object_conf = object_conf if object_conf is not None else phone_conf()
+
+        # Resolve names -> ids once, for whichever model actually loaded.
+        self.class_ids = resolve_class_ids(self._yolo, OBJECT_NAMES)
+        if not self.class_ids:
+            raise SystemExit(
+                f"{self._weights} knows none of {OBJECT_NAMES}: "
+                f"{sorted((self._yolo.names or {}).values())}"
+            )
 
         self._face_detection = mp.solutions.face_detection.FaceDetection(
             model_selection=0, min_detection_confidence=0.5
@@ -70,11 +99,29 @@ class FeatureExtractor:
         self._face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1, refine_landmarks=True
         )
-        self._yolo = YOLO(yolo_weights)
 
         # Blink state.
         self._closed_frames = 0
         self.blink_total = 0
+
+    def describe(self):
+        """One line naming the detector behind these features.
+
+        Worth printing wherever features are logged: rows produced by the COCO
+        baseline and rows produced by the fine-tune are NOT comparable, and a
+        dataset silently mixing the two would train on a moving target.
+        """
+        # Keyed off the weights actually loaded, not off which files exist on
+        # disk -- an explicitly-passed path must not be described as the default.
+        if self._weights == FINETUNED_WEIGHTS:
+            which = "Phase 2 fine-tune"
+        elif self._weights == BASELINE_WEIGHTS:
+            which = "stock COCO baseline -- weak on phones (recall 0.064 at conf 0.5)"
+        else:
+            which = f"{len(self._yolo.names or {})} classes"
+        tracking = [self._yolo.names[i] for i in self.class_ids]
+        return (f"{self._weights} ({which}), conf >= {self.object_conf}, "
+                f"tracking {tracking}")
 
     def extract(self, frame):
         """Return a dict of MEASUREMENT_FIELDS for one frame."""
@@ -131,7 +178,7 @@ class FeatureExtractor:
     def _extract_objects(self, frame, row):
         results = self._yolo(
             frame,
-            classes=list(YOLO_CLASSES.values()),
+            classes=self.class_ids,
             verbose=False,
         )
         names = self._yolo.names

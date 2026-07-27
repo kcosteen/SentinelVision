@@ -36,10 +36,8 @@ import os
 
 import cv2
 
+from src.detection.class_ids import phone_class_index
 from src.detection.detection_metrics import evaluate_detections
-
-# COCO class id for 'cell phone' -- what the pre-trained model calls our target.
-COCO_CELL_PHONE = 67
 
 # Deliberately near-zero: AP needs the full curve, not a pre-filtered top slice.
 AP_CONF_FLOOR = 0.001
@@ -160,7 +158,8 @@ def main():
     parser.add_argument("--eval-source", choices=["all", "own", "public"], default="all",
                         help="score on all val images, or only ours / only public")
     parser.add_argument("--baseline-only", action="store_true",
-                        help="score the pre-trained model without training")
+                        help="score --weights as-is without training (works for "
+                             "the COCO baseline or an existing fine-tune)")
     args = parser.parse_args()
 
     data_yaml = args.data or os.path.join(args.dataset_root, "data.yaml")
@@ -176,10 +175,18 @@ def main():
         raise SystemExit(f"No val images for --eval-source {args.eval_source}.")
     print(f"Val images ({args.eval_source}): {len(image_paths)}")
 
-    print(f"\nScoring baseline: {args.weights} (COCO 'cell phone')")
+    print(f"\nScoring baseline: {args.weights}")
     baseline = YOLO(args.weights)
+    # Look the phone class up from whatever model was actually passed. With a
+    # hard-coded 67 this command was only ever right for COCO weights: aimed at
+    # the six-class proctoring fine-tune it would filter for a class that does
+    # not exist, score zero predictions, and print AP 0.000 -- indistinguishable
+    # from a fine-tune that had catastrophically failed.
+    baseline_phone = phone_class_index(baseline)
+    print(f"  scoring class {baseline_phone} "
+          f"({baseline.names[baseline_phone]!r}) of {len(baseline.names)}")
     baseline_metrics = score_model(baseline, image_paths, args.dataset_root,
-                                   class_filter=[COCO_CELL_PHONE])
+                                   class_filter=[baseline_phone])
     print(f"  {baseline_metrics['n_predictions']} predictions over "
           f"{baseline_metrics['n_truths']} ground-truth boxes")
 

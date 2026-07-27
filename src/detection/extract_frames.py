@@ -42,6 +42,8 @@ import os
 
 import cv2
 
+from src.detection.class_ids import phone_class_index
+
 # Only these clips are assumed to contain a phone. The clip-level label is what
 # makes a no-detection frame a *known* miss rather than merely an empty frame.
 DEFAULT_CLIP_GLOB = "phone_*"
@@ -58,29 +60,6 @@ def find_clips(clips_dir, pattern):
     for ext in extensions:
         paths.extend(glob.glob(os.path.join(clips_dir, f"{pattern}.{ext}")))
     return sorted(paths)
-
-
-PHONE_CLASS_NAMES = {"cell phone", "phone", "mobile_phone", "mobile phone"}
-
-
-def phone_class_index(yolo):
-    """Which of THIS model's classes is the phone.
-
-    Must be looked up, not hard-coded: it's 67 in the 80-class COCO baseline, 0
-    in a single-class fine-tune, and 1 in the six-class proctoring fine-tune.
-    Asking for class 67 from a six-class model matches nothing and would report
-    a 0% detection rate that looks like catastrophic failure rather than a bug.
-    """
-    names = yolo.names or {}
-    index = next(
-        (i for i, n in names.items() if str(n).strip().lower() in PHONE_CLASS_NAMES),
-        None,
-    )
-    if index is None:
-        raise SystemExit(
-            f"No phone-like class in the model: {list(names.values())}"
-        )
-    return index
 
 
 def baseline_phone_conf(yolo, frame, conf_threshold, phone_class):
