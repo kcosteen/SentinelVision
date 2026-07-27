@@ -56,7 +56,7 @@ model card with full metrics and limitations). Drop it in
 weights and says so loudly, because the two are not interchangeable:
 
 ```bash
-huggingface-cli download kcosteen/sentinelvision-proctoring-yolov8n   proctoring_yolov8n_best.pt --local-dir models/detection
+hf download kcosteen/sentinelvision-proctoring-yolov8n proctoring_yolov8n_best.pt --local-dir models/detection
 ```
 
 The first ~3 seconds show `Calibrating scene…` while the background filter learns
