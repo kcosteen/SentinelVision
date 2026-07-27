@@ -9,6 +9,7 @@ data instead of guessed.**
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Face%20Mesh-00A67E)
 ![YOLOv8](https://img.shields.io/badge/YOLOv8-fine--tuned-7C3AED)
 ![Tests](https://img.shields.io/badge/tests-132%20passing-2ea44f)
+[![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-on%20Hugging%20Face-yellow)](https://huggingface.co/kcosteen/sentinelvision-proctoring-yolov8n)
 
 SentinelVision watches a live camera feed and flags the behaviours that matter in
 a remote exam — a candidate leaving frame, a second person appearing, looking
@@ -21,7 +22,7 @@ with a risk status.
 
 | What | Result | How it was measured |
 |---|---|---|
-| **Fine-tuned the phone detector** | F1 **0.193 → 0.923** | Both models scored by the same from-scratch AP/F1 code on the same held-out images |
+| **Fine-tuned the phone detector** ([weights ↗](https://huggingface.co/kcosteen/sentinelvision-proctoring-yolov8n)) | F1 **0.193 → 0.923** | Both models scored by the same from-scratch AP/F1 code on the same held-out images |
 | **Calibrated the decision thresholds** | 3 of 5 measured; the other 2 labelled as guesses | Swept against public labelled datasets, not picked by eye |
 | **Diagnosed a domain-shift failure** | 56.4% false-positive rate on an unseen camera | 741 phone-free frames; then fixed structurally, not by tuning |
 | **Test coverage** | 132 passing | Pure logic isolated from models, so it runs without a camera |
@@ -46,6 +47,16 @@ source .venv/bin/activate       # macOS / Linux
 
 pip install -r requirements.txt
 python main.py                  # press q to quit
+```
+
+The fine-tuned detector is on the Hugging Face Hub
+([`kcosteen/sentinelvision-proctoring-yolov8n`](https://huggingface.co/kcosteen/sentinelvision-proctoring-yolov8n),
+model card with full metrics and limitations). Drop it in
+`models/detection/` to use it — without it the app falls back to stock COCO
+weights and says so loudly, because the two are not interchangeable:
+
+```bash
+huggingface-cli download kcosteen/sentinelvision-proctoring-yolov8n   proctoring_yolov8n_best.pt --local-dir models/detection
 ```
 
 The first ~3 seconds show `Calibrating scene…` while the background filter learns
